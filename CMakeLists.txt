@@ -3,4 +3,4 @@ project(nes)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(nes main.cpp)
+add_executable(nes src/main.cpp)
