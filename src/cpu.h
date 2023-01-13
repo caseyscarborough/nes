@@ -4,11 +4,14 @@
 
 #include <cstdint>
 #include <string>
+#include "bus.h"
 
 class Cpu {
 public:
-    Cpu();
+    Cpu(Bus *bus);
 
+    void cycle();
+    void reset();
 private:
     uint8_t a;      // accumulator
     uint8_t x;      // x register
@@ -16,6 +19,11 @@ private:
     uint16_t pc;    // program counter
     uint8_t sp;     // stack pointer
     uint8_t status; // status register
+
+    // the main bus and methods for communicating with other components
+    Bus *bus;
+    uint8_t read(uint16_t address);
+    void write(uint16_t address, uint8_t data);
 
     // Flags for the status register
     enum Status {
@@ -85,11 +93,9 @@ private:
     void TXA();
     void TXS();
     void TYA();
-
     //endregion instructions
 
     //region Addressing modes used for each instruction
-
     uint8_t implied();
     uint8_t accumulator();
     uint8_t immediate();
@@ -102,11 +108,7 @@ private:
     uint8_t indirect();
     uint8_t indexed_indirect();
     uint8_t indirect_indexed();
-
     //endregion
-
-    void cycle();
-    void reset();
 };
 
 
