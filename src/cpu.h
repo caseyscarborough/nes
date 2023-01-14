@@ -46,8 +46,9 @@ private:
     uint16_t pc;      // program counter
     uint8_t sp;       // stack pointer
     uint8_t status;   // status register (P)
-    uint16_t cycles;  // total clock cycles
     uint16_t opcode;  // current operation
+    uint16_t cycles;  // current cycles
+    uint16_t total_cycles; // total clock cycles
 
     uint16_t current_address;    // current address
     AddressingMode current_mode; // current addressing mode
