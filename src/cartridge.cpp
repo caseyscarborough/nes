@@ -7,10 +7,11 @@ bool Cartridge::load(std::string path)  {
         LOG_ERROR("Could not open ROM file at path " << path)
         return false;
     }
+    this->path = path;
 
     Header header{};
     if (!file.read(reinterpret_cast<char*>(&header), sizeof(header))) {
-        LOG_ERROR("Could not read iNES header");
+        LOG_ERROR("Could not read iNES header from ROM! " << path);
         return false;
     }
 
@@ -20,5 +21,44 @@ bool Cartridge::load(std::string path)  {
         LOG_ERROR("Got:      " << std::hex << unsigned(header.constant[0]) << " " << unsigned(header.constant[1]) << " " << unsigned(header.constant[2]) << " " << unsigned(header.constant[3]))
         return false;
     }
+
+    if (header.prg_rom_size == 0) {
+        LOG_ERROR("Cartridge has no PRG-ROM! " << path);
+        return false;
+    }
+
+
+    if (has_flag(header.flags6, Trainer)) {
+        // Skip the 512-byte trainer if it exists
+        file.seekg(512, std::ios::cur);
+    }
+
+    // The upper half of flags 6 and 7 make up the mapper ID.
+    mapper_id = header.flags6 >> 4 | (header.flags7 & 0xF0);
+    prg_rom_size = header.prg_rom_size;
+    chr_rom_size = header.chr_rom_size;
+    version = has_flag(header.flags7, Nes2FormatA | Nes2FormatB) ? 2 : 1;
+    mirror = has_flag(header.flags6, Mirroring) ? Vertical : Horizontal;
+    system = has_flag(header.flags9, 1) ? PAL : NTSC;
+
+    // Read PRG-ROM into memory
+    prg_memory.resize(0x4000 * prg_rom_size);
+    file.read(reinterpret_cast<char*>(prg_memory.data()), prg_memory.size());
+
+    // Read CHR-ROM into memory
+    chr_memory.resize(0x2000 * chr_rom_size);
+    file.read(reinterpret_cast<char *>(chr_memory.data()), chr_memory.size());
+
+    LOG("Successfully loaded ROM!")
+    LOG(" - Path: " << this->path)
+    LOG(" - 16KB PRG-ROM Banks: " << unsigned(prg_rom_size) << " (" << unsigned(prg_memory.size() / 1024) << "KB)")
+    LOG(" -  8KB CHR-ROM Banks: " << unsigned(chr_rom_size) << " (" << unsigned(chr_memory.size() / 1024) << "KB)")
+    LOG(" - iNES Format: " << unsigned(version))
+    LOG(" - Mapper ID: " << unsigned(mapper_id))
+    LOG(" - TV System: " << (system == NTSC ? "NTSC" : "PAL"))
     return true;
+}
+
+bool Cartridge::has_flag(uint8_t flags, uint8_t flag)  {
+    return (flags & flag) == flag;
 }
