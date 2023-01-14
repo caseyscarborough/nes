@@ -13,18 +13,6 @@ public:
     void cycle();
     void reset();
 private:
-    uint8_t a;      // accumulator
-    uint8_t x;      // x register
-    uint8_t y;      // y register
-    uint16_t pc;    // program counter
-    uint8_t sp;     // stack pointer
-    uint8_t status; // status register
-
-    // the main bus and methods for communicating with other components
-    Bus *bus;
-    uint8_t read(uint16_t address);
-    void write(uint16_t address, uint8_t data);
-
     // Flags for the status register
     enum Status {
         C = 1 << 0, // carry
@@ -35,6 +23,40 @@ private:
         V = 1 << 6, // overflow
         N = 1 << 7, // negative
     };
+
+    enum AddressingMode {
+        Implied,
+        Accumulator,
+        Immediate,
+        ZeroPage,
+        ZeroPageX,
+        ZeroPageY,
+        Absolute,
+        AbsoluteX,
+        AbsoluteY,
+        Indirect,
+        IndirectX,
+        IndirectY,
+        Relative,
+    };
+
+    uint8_t a;        // accumulator
+    uint8_t x;        // x register
+    uint8_t y;        // y register
+    uint16_t pc;      // program counter
+    uint8_t sp;       // stack pointer
+    uint8_t status;   // status register (P)
+    uint16_t cycles;  // total clock cycles
+    uint16_t opcode;  // current operation
+
+    uint16_t current_address;    // current address
+    AddressingMode current_mode; // current addressing mode
+
+    // the main bus and methods for communicating with other components
+    Bus *bus;
+    uint8_t read(uint16_t address);
+    uint16_t read_word(uint16_t address);
+    void write(uint16_t address, uint8_t data);
 
     //region instructions
     void ADC();
@@ -96,18 +118,24 @@ private:
     //endregion instructions
 
     //region Addressing modes used for each instruction
-    uint8_t implied();
-    uint8_t accumulator();
-    uint8_t immediate();
-    uint8_t zero_page();
-    uint8_t zero_page_x();
-    uint8_t relative();
-    uint8_t absolute();
-    uint8_t absolute_x();
-    uint8_t absolute_y();
-    uint8_t indirect();
-    uint8_t indexed_indirect();
-    uint8_t indirect_indexed();
+    // see:
+    // - https://www.nesdev.org/wiki/CPU_addressing_modes
+    // - https://www.nesdev.org/obelisk-6502-guide/reference.html
+    // - http://archive.6502.org/datasheets/rockwell_r650x_r651x.pdf
+    // - https://www.masswerk.at/6502/6502_instruction_set.html
+    void implied();
+    void accumulator();
+    void immediate();
+    void zero_page();
+    void zero_page_x();
+    void zero_page_y();
+    void absolute();
+    void absolute_x();
+    void absolute_y();
+    void indirect();
+    void indirect_x();
+    void indirect_y();
+    void relative();
     //endregion
 };
 
