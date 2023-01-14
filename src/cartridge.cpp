@@ -1,6 +1,7 @@
 #include "cartridge.h"
+#include "mappers/mapper_nmrom.h"
 
-bool Cartridge::load(std::string path)  {
+bool Cartridge::load(std::string path) {
     LOG("Loading ROM from path " << path)
     std::ifstream file(path, std::ios_base::binary | std::ios_base::in);
     if (!file || !file.is_open()) {
@@ -10,15 +11,17 @@ bool Cartridge::load(std::string path)  {
     this->path = path;
 
     Header header{};
-    if (!file.read(reinterpret_cast<char*>(&header), sizeof(header))) {
+    if (!file.read(reinterpret_cast<char *>(&header), sizeof(header))) {
         LOG_ERROR("Could not read iNES header from ROM! " << path);
         return false;
     }
 
-    if (header.constant[0] != 'N' || header.constant[1] != 'E' || header.constant[2] != 'S' || header.constant[3] != '\x1A') {
+    if (header.constant[0] != 'N' || header.constant[1] != 'E' || header.constant[2] != 'S' ||
+        header.constant[3] != '\x1A') {
         LOG_ERROR("iNES header is not in valid format. Possibly a different format?")
         LOG_ERROR("Expected: 4e 45 53 1a")
-        LOG_ERROR("Got:      " << std::hex << unsigned(header.constant[0]) << " " << unsigned(header.constant[1]) << " " << unsigned(header.constant[2]) << " " << unsigned(header.constant[3]))
+        LOG_ERROR("Got:      " << std::hex << unsigned(header.constant[0]) << " " << unsigned(header.constant[1]) << " "
+                               << unsigned(header.constant[2]) << " " << unsigned(header.constant[3]))
         return false;
     }
 
@@ -43,11 +46,20 @@ bool Cartridge::load(std::string path)  {
 
     // Read PRG-ROM into memory
     prg_memory.resize(0x4000 * prg_rom_size);
-    file.read(reinterpret_cast<char*>(prg_memory.data()), prg_memory.size());
+    file.read(reinterpret_cast<char *>(prg_memory.data()), prg_memory.size());
 
     // Read CHR-ROM into memory
     chr_memory.resize(0x2000 * chr_rom_size);
     file.read(reinterpret_cast<char *>(chr_memory.data()), chr_memory.size());
+
+
+    switch (mapper_id) {
+        case Mapper::NMROM:
+            mapper = std::make_shared<MapperNMROM>();
+            break;
+        default:
+            LOG_ERROR("Mapper " << unsigned(mapper_id) << " is not implemented!")
+    }
 
     LOG("Successfully loaded ROM!")
     LOG(" - Path: " << this->path)
@@ -59,6 +71,6 @@ bool Cartridge::load(std::string path)  {
     return true;
 }
 
-bool Cartridge::has_flag(uint8_t flags, uint8_t flag)  {
+bool Cartridge::has_flag(uint8_t flags, uint8_t flag) {
     return (flags & flag) == flag;
 }

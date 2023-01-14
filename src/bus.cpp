@@ -1,7 +1,8 @@
 #include "bus.h"
 #include "log.h"
 
-Bus::Bus() {}
+Bus::Bus(Cpu* cpu, Cartridge* cartridge): cpu(cpu), cartridge(cartridge) {
+}
 
 uint8_t Bus::read(uint16_t address) {
     if (address >= 0x0000 && address <= 0x1FFF) {

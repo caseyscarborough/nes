@@ -4,7 +4,8 @@
 
 #include <cstdint>
 #include <string>
-#include "bus.h"
+
+class Bus;
 
 class Cpu {
 public:

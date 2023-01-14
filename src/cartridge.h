@@ -5,7 +5,9 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <memory>
 #include "log.h"
+#include "mappers/mapper.h"
 
 class Cartridge {
 
@@ -56,6 +58,7 @@ class Cartridge {
     uint8_t prg_ram_size;
     uint8_t version;
 
+    std::shared_ptr<Mapper> mapper;
     std::vector<uint8_t> prg_memory;
     std::vector<uint8_t> chr_memory;
 

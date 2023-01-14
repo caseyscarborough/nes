@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include "bus.h"
 
 Cpu::Cpu(Bus *bus) : bus(bus) {
     reset();
