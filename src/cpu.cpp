@@ -8,9 +8,8 @@ const uint16_t STACK_PAGE = 0x0100;
 // Convenience for status register flags
 using Flag = StatusRegister::Flag;
 
-Cpu::Cpu(Bus *bus) : bus(bus) {
-    initialize_lookup_table();
-    reset();
+Cpu::Cpu(Bus *bus) {
+    this->bus = bus;
 }
 
 // Read a single byte from the bus.
@@ -42,7 +41,7 @@ void Cpu::write_acc(uint16_t address, uint8_t data) {
 
 // The cycle for each "tick" of the processor.
 void Cpu::cycle() {
-    LOG_TRACE("Executing CPU cycle " << total_cycles++)
+    LOG_TRACE("Executing CPU cycle " << unsigned(total_cycles++))
     // We perform all necessary cycles for one operation at a single time,
     // then "sleep" for the remaining cycles
     if (cycles != 0) {
@@ -61,7 +60,7 @@ void Cpu::cycle() {
     cycles += current_instruction.cycles;
 
     // Call the addressing mode function and execute the operation.
-    LOG_TRACE("Executing opcode 0x" << std::hex << std::uppercase << current_instruction.opcode)
+    LOG_TRACE("Executing opcode 0x" << std::hex << std::uppercase << opcode)
     (this->*current_instruction.ref_mode)();
     (this->*current_instruction.ref_operation)();
 
@@ -709,7 +708,7 @@ uint16_t Cpu::stack_pop_word() {
 
 // Initializes the mappings for all instructions.
 // See https://www.masswerk.at/6502/6502_instruction_set.html
-void Cpu::initialize_lookup_table() {
+void Cpu::initialize() {
     using Type = Cpu::InstructionType;
     using Mode = Cpu::AddressingMode;
     //@formatter:off
@@ -972,6 +971,7 @@ void Cpu::initialize_lookup_table() {
             { 0xFF, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
     };
     //@formatter:on
+    reset();
 }
 
 //endregion

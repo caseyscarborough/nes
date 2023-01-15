@@ -1,4 +1,6 @@
 #include "cartridge.h"
+
+#include <memory>
 #include "mappers/mapper_nmrom.h"
 
 bool Cartridge::load(const std::string &path) {
@@ -52,10 +54,9 @@ bool Cartridge::load(const std::string &path) {
     chr_memory.resize(0x2000 * chr_rom_size);
     file.read(reinterpret_cast<char *>(chr_memory.data()), chr_memory.size());
 
-
     switch (mapper_id) {
         case Mapper::NMROM:
-            mapper = std::make_shared<MapperNMROM>();
+            this->mapper = new MapperNMROM();
             break;
         default:
             LOG_ERROR("Mapper " << unsigned(mapper_id) << " is not implemented!")
@@ -64,8 +65,8 @@ bool Cartridge::load(const std::string &path) {
 
     LOG("Successfully loaded ROM!")
     LOG(" - Path: " << this->path)
-    LOG(" - 16KB PRG-ROM Banks: " << unsigned(prg_rom_size) << " (" << unsigned(prg_memory.size() / 1024) << "KB)")
-    LOG(" -  8KB CHR-ROM Banks: " << unsigned(chr_rom_size) << " (" << unsigned(chr_memory.size() / 1024) << "KB)")
+    LOG(" - PRG-ROM Banks (16KB): " << unsigned(prg_rom_size) << " (" << unsigned(prg_memory.size() / 1024) << "KB)")
+    LOG(" - CHR-ROM Banks (8KB): " << unsigned(chr_rom_size) << " (" << unsigned(chr_memory.size() / 1024) << "KB)")
     LOG(" - iNES Format: " << unsigned(version))
     LOG(" - Mapper ID: " << unsigned(mapper_id))
     LOG(" - TV System: " << (system == NTSC ? "NTSC" : "PAL"))

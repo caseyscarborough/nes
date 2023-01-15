@@ -13,6 +13,7 @@ class Cpu {
 public:
     Cpu(Bus *bus);
 
+    void initialize();
     void cycle();
     void reset();
 private:
