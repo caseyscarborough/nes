@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 #include "register.h"
 
 class Bus;
@@ -15,23 +16,25 @@ public:
     void cycle();
     void reset();
 private:
-
-    enum AddressingMode {
-        Implied,
-        Accumulator,
-        Immediate,
-        ZeroPage,
-        ZeroPageX,
-        ZeroPageY,
-        Absolute,
-        AbsoluteX,
-        AbsoluteY,
-        Indirect,
-        IndirectX,
-        IndirectY,
-        Relative,
+    enum class InstructionType {
+        ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC,
+        CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY, EOR, INC, INX, INY, JMP,
+        JSR, LDA, LDX, LDY, LSR, NOP, ORA, PHA, PHP, PLA, PLP, ROL, ROR, RTI,
+        RTS, SBC, SEC, SED, SEI, STA, STX, STY, TAX, TAY, TSX, TXA, TXS, TYA
     };
-
+    enum class AddressingMode {
+        Implied, Accumulator, Immediate, ZeroPage, ZeroPageX, ZeroPageY,
+        Absolute, AbsoluteX, AbsoluteY, Indirect, IndirectX, IndirectY, Relative,
+    };
+    struct Instruction {
+        uint8_t opcode;
+        InstructionType type;
+        AddressingMode mode;
+        void (Cpu::*ref_operation)();
+        void (Cpu::*ref_mode)();
+        uint8_t bytes;
+        uint8_t cycles;
+    };
     uint8_t a;        // accumulator
     uint8_t x;        // x register
     uint8_t y;        // y register
@@ -42,8 +45,9 @@ private:
     StatusRegister status; // status register (P)
     uint16_t total_cycles; // total clock cycles
 
-    uint16_t current_address;    // current address
-    AddressingMode current_mode; // current addressing mode
+    uint16_t current_address; // current address
+    Instruction current_instruction; // current instruction
+    std::vector<Instruction> instructions; // instruction lookup table
 
     // the main bus and methods for communicating with other components
     Bus *bus;
@@ -57,6 +61,7 @@ private:
     void stack_push_word(uint16_t data);
     uint8_t stack_pop();
     uint16_t stack_pop_word();
+    void initialize_lookup_table();
 
     //region instructions
     void ADC();

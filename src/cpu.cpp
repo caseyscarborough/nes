@@ -9,19 +9,23 @@ const uint16_t STACK_PAGE = 0x0100;
 using Flag = StatusRegister::Flag;
 
 Cpu::Cpu(Bus *bus) : bus(bus) {
+    initialize_lookup_table();
     reset();
 }
 
+// Read a single byte from the bus.
 uint8_t Cpu::read(uint16_t address) {
     return bus->read(address);
 }
 
+// Read two bytes from the bus.
 uint16_t Cpu::read_word(uint16_t address) {
     uint16_t lo = read(address);
     uint16_t hi = read(address + 1) << 8;
     return hi | lo;
 }
 
+// Write data to the bus.
 void Cpu::write(uint16_t address, uint8_t data) {
     bus->write(address, data);
 }
@@ -29,184 +33,43 @@ void Cpu::write(uint16_t address, uint8_t data) {
 // Write to the accumulator if we're in Accumulator mode,
 // otherwise write to the bus.
 void Cpu::write_acc(uint16_t address, uint8_t data) {
-    if (current_mode == Accumulator) {
+    if (current_instruction.mode == AddressingMode::Accumulator) {
         a = data;
     } else {
         write(address, data);
     }
 }
 
-
+// The cycle for each "tick" of the processor.
 void Cpu::cycle() {
-    total_cycles++;
+    LOG_TRACE("Executing CPU cycle " << total_cycles++)
+    // We perform all necessary cycles for one operation at a single time,
+    // then "sleep" for the remaining cycles
     if (cycles != 0) {
         cycles--;
         return;
     }
 
-    opcode = read(pc);
-    pc++;
+    // Read the next operation from memory, then increment the program counter.
+    opcode = read(pc++);
 
-    // TODO: Handle cycle count for each operation
+    // The opcode matches the index of the instruction in the lookup table,
+    // which makes it easy to look up.
+    current_instruction = instructions[opcode];
 
-    //@formatter:off
-    switch (opcode) {
-        case 0x69: { immediate();   ADC(); break; }
-        case 0x65: { zero_page();   ADC(); break; }
-        case 0x75: { zero_page_x(); ADC(); break; }
-        case 0x6D: { absolute();    ADC(); break; }
-        case 0x7D: { absolute_x();  ADC(); break; }
-        case 0x79: { absolute_y();  ADC(); break; }
-        case 0x61: { indirect_x();  ADC(); break; }
-        case 0x71: { indirect_y();  ADC(); break; }
-        case 0x29: { immediate();   AND(); break; }
-        case 0x25: { zero_page();   AND(); break; }
-        case 0x35: { zero_page_x(); AND(); break; }
-        case 0x2D: { absolute();    AND(); break; }
-        case 0x3D: { absolute_x();  AND(); break; }
-        case 0x39: { absolute_y();  AND(); break; }
-        case 0x21: { indirect_x();  AND(); break; }
-        case 0x31: { indirect_y();  AND(); break; }
-        case 0x0A: { accumulator(); ASL(); break; }
-        case 0x06: { zero_page();   ASL(); break; }
-        case 0x16: { zero_page_x(); ASL(); break; }
-        case 0x0E: { absolute();    ASL(); break; }
-        case 0x1E: { absolute_x();  ASL(); break; }
-        case 0x90: { relative();    BCC(); break; }
-        case 0xB0: { relative();    BCS(); break; }
-        case 0xF0: { relative();    BEQ(); break; }
-        case 0x24: { zero_page();   BIT(); break; }
-        case 0x2C: { absolute();    BIT(); break; }
-        case 0x30: { relative();    BMI(); break; }
-        case 0xD0: { relative();    BNE(); break; }
-        case 0x10: { relative();    BPL(); break; }
-        case 0x00: { implied();     BRK(); break; }
-        case 0x50: { relative();    BVC(); break; }
-        case 0x70: { relative();    BVS(); break; }
-        case 0x18: { implied();     CLC(); break; }
-        case 0xD8: { implied();     CLD(); break; }
-        case 0x58: { implied();     CLI(); break; }
-        case 0xB8: { implied();     CLV(); break; }
-        case 0xC9: { immediate();   CMP(); break; }
-        case 0xC5: { zero_page();   CMP(); break; }
-        case 0xD5: { zero_page_x(); CMP(); break; }
-        case 0xCD: { absolute();    CMP(); break; }
-        case 0xDD: { absolute_x();  CMP(); break; }
-        case 0xD9: { absolute_y();  CMP(); break; }
-        case 0xC1: { indirect_x();  CMP(); break; }
-        case 0xD1: { indirect_y();  CMP(); break; }
-        case 0xE0: { immediate();   CPX(); break; }
-        case 0xE4: { zero_page();   CPX(); break; }
-        case 0xEC: { absolute();    CPX(); break; }
-        case 0xC0: { immediate();   CPY(); break; }
-        case 0xC4: { zero_page();   CPY(); break; }
-        case 0xCC: { absolute();    CPY(); break; }
-        case 0xC6: { zero_page();   DEC(); break; }
-        case 0xD6: { zero_page_x(); DEC(); break; }
-        case 0xCE: { absolute();    DEC(); break; }
-        case 0xDE: { absolute_x();  DEC(); break; }
-        case 0xCA: { implied();     DEX(); break; }
-        case 0x88: { implied();     DEY(); break; }
-        case 0x49: { immediate();   EOR(); break; }
-        case 0x45: { zero_page();   EOR(); break; }
-        case 0x55: { zero_page_x(); EOR(); break; }
-        case 0x4D: { absolute();    EOR(); break; }
-        case 0x5D: { absolute_x();  EOR(); break; }
-        case 0x59: { absolute_y();  EOR(); break; }
-        case 0x41: { indirect_x();  EOR(); break; }
-        case 0x51: { indirect_y();  EOR(); break; }
-        case 0xE6: { zero_page();   INC(); break; }
-        case 0xF6: { zero_page_x(); INC(); break; }
-        case 0xEE: { absolute();    INC(); break; }
-        case 0xFE: { absolute_x();  INC(); break; }
-        case 0xE8: { implied();     INX(); break; }
-        case 0xC8: { implied();     INY(); break; }
-        case 0x4C: { absolute();    JMP(); break; }
-        case 0x6C: { indirect();    JMP(); break; }
-        case 0x20: { absolute();    JSR(); break; }
-        case 0xA9: { immediate();   LDA(); break; }
-        case 0xA5: { zero_page();   LDA(); break; }
-        case 0xB5: { zero_page_x(); LDA(); break; }
-        case 0xAD: { absolute();    LDA(); break; }
-        case 0xBD: { absolute_x();  LDA(); break; }
-        case 0xB9: { absolute_y();  LDA(); break; }
-        case 0xA1: { indirect_x();  LDA(); break; }
-        case 0xB1: { indirect_y();  LDA(); break; }
-        case 0xA2: { immediate();   LDX(); break; }
-        case 0xA6: { zero_page();   LDX(); break; }
-        case 0xB6: { zero_page_y(); LDX(); break; }
-        case 0xAE: { absolute();    LDX(); break; }
-        case 0xBE: { absolute_y();  LDX(); break; }
-        case 0xA0: { immediate();   LDY(); break; }
-        case 0xA4: { zero_page();   LDY(); break; }
-        case 0xB4: { zero_page_x(); LDY(); break; }
-        case 0xAC: { absolute();    LDY(); break; }
-        case 0xBC: { absolute_x();  LDY(); break; }
-        case 0x4A: { accumulator(); LSR(); break; }
-        case 0x46: { zero_page();   LSR(); break; }
-        case 0x56: { zero_page_x(); LSR(); break; }
-        case 0x4E: { absolute();    LSR(); break; }
-        case 0x5E: { absolute_x();  LSR(); break; }
-        case 0x09: { immediate();   ORA(); break; }
-        case 0x05: { zero_page();   ORA(); break; }
-        case 0x15: { zero_page_x(); ORA(); break; }
-        case 0x0D: { absolute();    ORA(); break; }
-        case 0x1D: { absolute_x();  ORA(); break; }
-        case 0x19: { absolute_y();  ORA(); break; }
-        case 0x01: { indirect_x();  ORA(); break; }
-        case 0x11: { indirect_y();  ORA(); break; }
-        case 0x48: { implied();     PHA(); break; }
-        case 0x08: { implied();     PHP(); break; }
-        case 0x68: { implied();     PLA(); break; }
-        case 0x28: { implied();     PLP(); break; }
-        case 0x2A: { accumulator(); ROL(); break; }
-        case 0x26: { zero_page();   ROL(); break; }
-        case 0x36: { zero_page_x(); ROL(); break; }
-        case 0x2E: { absolute();    ROL(); break; }
-        case 0x3E: { absolute_x();  ROL(); break; }
-        case 0x6A: { accumulator(); ROR(); break; }
-        case 0x66: { zero_page();   ROR(); break; }
-        case 0x76: { zero_page_x(); ROR(); break; }
-        case 0x6E: { absolute();    ROR(); break; }
-        case 0x7E: { absolute_x();  ROR(); break; }
-        case 0x40: { implied();     RTI(); break; }
-        case 0x60: { implied();     RTS(); break; }
-        case 0xE9: { immediate();   SBC(); break; }
-        case 0xE5: { zero_page();   SBC(); break; }
-        case 0xF5: { zero_page_x(); SBC(); break; }
-        case 0xED: { absolute();    SBC(); break; }
-        case 0xFD: { absolute_x();  SBC(); break; }
-        case 0xF9: { absolute_y();  SBC(); break; }
-        case 0xE1: { indirect_x();  SBC(); break; }
-        case 0xF1: { indirect_y();  SBC(); break; }
-        case 0x38: { implied();     SEC(); break; }
-        case 0xF8: { implied();     SED(); break; }
-        case 0x78: { implied();     SEI(); break; }
-        case 0x85: { zero_page();   STA(); break; }
-        case 0x95: { zero_page_x(); STA(); break; }
-        case 0x8D: { absolute();    STA(); break; }
-        case 0x9D: { absolute_x();  STA(); break; }
-        case 0x99: { absolute_y();  STA(); break; }
-        case 0x81: { indirect_x();  STA(); break; }
-        case 0x91: { indirect_y();  STA(); break; }
-        case 0x86: { zero_page();   STX(); break; }
-        case 0x96: { zero_page_y(); STX(); break; }
-        case 0x8E: { absolute();    STX(); break; }
-        case 0x84: { zero_page();   STY(); break; }
-        case 0x94: { zero_page_y(); STY(); break; }
-        case 0x8C: { absolute();    STY(); break; }
-        case 0xAA: { implied();     TAX(); break; }
-        case 0xA8: { implied();     TAY(); break; }
-        case 0xBA: { implied();     TSX(); break; }
-        case 0x8A: { implied();     TXA(); break; }
-        case 0x9A: { implied();     TXS(); break; }
-        case 0x98: { implied();     TYA(); break; }
-        case 0xEA:
-        default:   { implied();     NOP(); break; }
-    }
-    //@formatter:on
+    // Add the predefined number of cycles for each operation.
+    cycles += current_instruction.cycles;
+
+    // Call the addressing mode function and execute the operation.
+    LOG_TRACE("Executing opcode 0x" << std::hex << std::uppercase << current_instruction.opcode)
+    (this->*current_instruction.ref_mode)();
+    (this->*current_instruction.ref_operation)();
+
+    // Decrement cycles since we just executed one for this operation.
+    cycles--;
 }
 
+// Reset the CPU to it's initial state.
 void Cpu::reset() {
     pc = read_word(0xFFFC);
     a = 0;
@@ -224,20 +87,17 @@ void Cpu::reset() {
 // This is for operations like CLC (Clear Carry Flag), TXA (transfer
 // contents of the X-register to the accumulator), etc.
 void Cpu::implied() {
-    current_mode = Implied;
     current_address = a;
 }
 
 // Operate directly on the accumulator. This case is essentially covered
 // with Implied addressing mode, so it may not be needed. TBD.
 void Cpu::accumulator() {
-    current_mode = Accumulator;
     // nothing to be done
 }
 
 // The second byte of the instruction contains the operand.
 void Cpu::immediate() {
-    current_mode = Immediate;
     current_address = pc++;
 }
 
@@ -246,25 +106,21 @@ void Cpu::immediate() {
 // only need a single byte to specify an address within it.
 // The byte at this address will be the one operated on.
 void Cpu::zero_page() {
-    current_mode = ZeroPage;
     current_address = read(pc) & 0xFF;
 }
 
 // The same as Zero Page addressing but using the X register as an offset.
 void Cpu::zero_page_x() {
-    current_mode = ZeroPageX;
     current_address = (read(pc) + x) & 0xFF;
 }
 
 // The same as Zero Page addressing but using the Y register as an offset.
 void Cpu::zero_page_y() {
-    current_mode = ZeroPageY;
     current_address = (read(pc) + x) & 0xFF;
 }
 
 // Read a two byte address in the CPU's address space to be operated on.
 void Cpu::absolute() {
-    current_mode = Absolute;
     current_address = read_word(pc);
     pc += 2;
 }
@@ -272,7 +128,6 @@ void Cpu::absolute() {
 // The same as Absolute addressing but uses the X register as an offset.
 // This mode will take an extra cycle if the page boundary is crossed.
 void Cpu::absolute_x() {
-    current_mode = AbsoluteX;
     uint16_t address = read_word(pc);
     current_address = address + x;
     if ((current_address & 0xFF00) != (address & 0xFF00)) {
@@ -284,7 +139,6 @@ void Cpu::absolute_x() {
 // The same as Absolute addressing but uses the Y register as an offset.
 // This mode will take an extra cycle if the page boundary is crossed.
 void Cpu::absolute_y() {
-    current_mode = AbsoluteY;
     uint16_t address = read_word(pc);
     current_address = address + y;
     if ((current_address & 0xFF00) != (address & 0xFF00)) {
@@ -296,7 +150,6 @@ void Cpu::absolute_y() {
 // Uses the contents of the retrieved address as the effective address.
 // These will not overflow into the next page but wrap back around.
 void Cpu::indirect() {
-    current_mode = Indirect;
     uint16_t lo = read(pc++);
     uint16_t hi = read(pc++);
 
@@ -311,7 +164,6 @@ void Cpu::indirect() {
 // offset by the X register. This will also not overflow but wrap back
 // around.
 void Cpu::indirect_x() {
-    current_mode = IndirectX;
     uint8_t address = read(pc++);
     uint8_t lo = read((address + x) & 0x00FF);
     uint8_t hi = read((address + x + 1) & 0x00FF);
@@ -321,7 +173,6 @@ void Cpu::indirect_x() {
 // A single byte address indexes a location in the zero page.
 // We add an extra cycle if the page boundary is crossed.
 void Cpu::indirect_y() {
-    current_mode = IndirectY;
     uint16_t address = read(pc++);
     uint16_t lo = read(address & 0x00FF);
     uint16_t hi = read((address + 1) & 0x00FF) << 8;
@@ -334,7 +185,6 @@ void Cpu::indirect_y() {
 // Branch instructions can only jump to a "relative" address
 // in the same area (offset between -128 and 127).
 void Cpu::relative() {
-    current_mode = Relative;
     uint16_t offset = read(pc++);
     current_address = offset + pc;
 }
@@ -855,6 +705,273 @@ uint16_t Cpu::stack_pop_word() {
     uint8_t low = stack_pop();
     uint16_t hi = (stack_pop() << 8);
     return (hi | low);
+}
+
+// Initializes the mappings for all instructions.
+// See https://www.masswerk.at/6502/6502_instruction_set.html
+void Cpu::initialize_lookup_table() {
+    using Type = Cpu::InstructionType;
+    using Mode = Cpu::AddressingMode;
+    //@formatter:off
+    instructions = {
+            { 0x00, Type::BRK, Mode::Implied,     &Cpu::BRK, &Cpu::implied,     1, 7 },
+            { 0x01, Type::ORA, Mode::IndirectX,   &Cpu::ORA, &Cpu::indirect_x,  2, 6 },
+            { 0x02, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x03, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x04, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x05, Type::ORA, Mode::ZeroPage,    &Cpu::ORA, &Cpu::zero_page,   2, 3 },
+            { 0x06, Type::ASL, Mode::ZeroPage,    &Cpu::ASL, &Cpu::zero_page,   2, 5 },
+            { 0x07, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x08, Type::PHP, Mode::Implied,     &Cpu::PHP, &Cpu::implied,     1, 3 },
+            { 0x09, Type::ORA, Mode::Immediate,   &Cpu::ORA, &Cpu::immediate,   2, 2 },
+            { 0x0A, Type::ASL, Mode::Accumulator, &Cpu::ASL, &Cpu::accumulator, 1, 2 },
+            { 0x0B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x0C, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x0D, Type::ORA, Mode::Absolute,    &Cpu::ORA, &Cpu::absolute,    3, 4 },
+            { 0x0E, Type::ASL, Mode::Absolute,    &Cpu::ASL, &Cpu::absolute,    3, 6 },
+            { 0x0F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x10, Type::BPL, Mode::Relative,    &Cpu::BPL, &Cpu::relative,    2, 2 },
+            { 0x11, Type::ORA, Mode::IndirectY,   &Cpu::ORA, &Cpu::indirect_y,  2, 5 },
+            { 0x12, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x13, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x14, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x15, Type::ORA, Mode::ZeroPageX,   &Cpu::ORA, &Cpu::zero_page_x, 2, 4 },
+            { 0x16, Type::ASL, Mode::ZeroPageX,   &Cpu::ASL, &Cpu::zero_page_x, 2, 6 },
+            { 0x17, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x18, Type::CLC, Mode::Implied,     &Cpu::CLC, &Cpu::implied,     1, 2 },
+            { 0x19, Type::ORA, Mode::AbsoluteY,   &Cpu::ORA, &Cpu::absolute_y,  3, 4 },
+            { 0x1A, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x1B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x1C, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x1D, Type::ORA, Mode::AbsoluteX,   &Cpu::ORA, &Cpu::absolute_x,  3, 4 },
+            { 0x1E, Type::ASL, Mode::AbsoluteX,   &Cpu::ASL, &Cpu::absolute_x,  3, 7 },
+            { 0x1F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x20, Type::JSR, Mode::Absolute,    &Cpu::JSR, &Cpu::absolute,    3, 6 },
+            { 0x21, Type::AND, Mode::IndirectX,   &Cpu::AND, &Cpu::indirect_x,  2, 6 },
+            { 0x22, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x23, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x24, Type::BIT, Mode::ZeroPage,    &Cpu::BIT, &Cpu::zero_page,   2, 3 },
+            { 0x25, Type::AND, Mode::ZeroPage,    &Cpu::AND, &Cpu::zero_page,   2, 3 },
+            { 0x26, Type::ROL, Mode::ZeroPage,    &Cpu::ROL, &Cpu::zero_page,   2, 5 },
+            { 0x27, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x28, Type::PLP, Mode::Implied,     &Cpu::PLP, &Cpu::implied,     1, 4 },
+            { 0x29, Type::AND, Mode::Immediate,   &Cpu::AND, &Cpu::immediate,   2, 2 },
+            { 0x2A, Type::ROL, Mode::Accumulator, &Cpu::ROL, &Cpu::accumulator, 1, 2 },
+            { 0x2B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x2C, Type::BIT, Mode::Absolute,    &Cpu::BIT, &Cpu::absolute,    3, 4 },
+            { 0x2D, Type::AND, Mode::Absolute,    &Cpu::AND, &Cpu::absolute,    3, 4 },
+            { 0x2E, Type::ROL, Mode::Absolute,    &Cpu::ROL, &Cpu::absolute,    3, 6 },
+            { 0x2F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x30, Type::BMI, Mode::Relative,    &Cpu::BMI, &Cpu::relative,    2, 2 },
+            { 0x31, Type::AND, Mode::IndirectY,   &Cpu::AND, &Cpu::indirect_y,  2, 5 },
+            { 0x32, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x33, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x34, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x35, Type::AND, Mode::ZeroPageX,   &Cpu::AND, &Cpu::zero_page_x, 2, 4 },
+            { 0x36, Type::ROL, Mode::ZeroPageX,   &Cpu::ROL, &Cpu::zero_page_x, 2, 6 },
+            { 0x37, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x38, Type::SEC, Mode::Implied,     &Cpu::SEC, &Cpu::implied,     1, 2 },
+            { 0x39, Type::AND, Mode::AbsoluteY,   &Cpu::AND, &Cpu::absolute_y,  3, 4 },
+            { 0x3A, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x3B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x3C, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x3D, Type::AND, Mode::AbsoluteX,   &Cpu::AND, &Cpu::absolute_x,  3, 4 },
+            { 0x3E, Type::ROL, Mode::AbsoluteX,   &Cpu::ROL, &Cpu::absolute_x,  3, 7 },
+            { 0x3F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x40, Type::RTI, Mode::Implied,     &Cpu::RTI, &Cpu::implied,     1, 6 },
+            { 0x41, Type::EOR, Mode::IndirectX,   &Cpu::EOR, &Cpu::indirect_x,  2, 6 },
+            { 0x42, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x43, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x44, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x45, Type::EOR, Mode::ZeroPage,    &Cpu::EOR, &Cpu::zero_page,   2, 3 },
+            { 0x46, Type::LSR, Mode::ZeroPage,    &Cpu::LSR, &Cpu::zero_page,   2, 5 },
+            { 0x47, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x48, Type::PHA, Mode::Implied,     &Cpu::PHA, &Cpu::implied,     1, 3 },
+            { 0x49, Type::EOR, Mode::Immediate,   &Cpu::EOR, &Cpu::immediate,   2, 2 },
+            { 0x4A, Type::LSR, Mode::Accumulator, &Cpu::LSR, &Cpu::accumulator, 1, 2 },
+            { 0x4B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x4C, Type::JMP, Mode::Absolute,    &Cpu::JMP, &Cpu::absolute,    3, 3 },
+            { 0x4D, Type::EOR, Mode::Absolute,    &Cpu::EOR, &Cpu::absolute,    3, 4 },
+            { 0x4E, Type::LSR, Mode::Absolute,    &Cpu::LSR, &Cpu::absolute,    3, 6 },
+            { 0x4F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x50, Type::BVC, Mode::Relative,    &Cpu::BVC, &Cpu::relative,    2, 2 },
+            { 0x51, Type::EOR, Mode::IndirectY,   &Cpu::EOR, &Cpu::indirect_y,  2, 5 },
+            { 0x52, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x53, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x54, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x55, Type::EOR, Mode::ZeroPageX,   &Cpu::EOR, &Cpu::zero_page_x, 2, 4 },
+            { 0x56, Type::LSR, Mode::ZeroPageX,   &Cpu::LSR, &Cpu::zero_page_x, 2, 6 },
+            { 0x57, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x58, Type::CLI, Mode::Implied,     &Cpu::CLI, &Cpu::implied,     1, 2 },
+            { 0x59, Type::EOR, Mode::AbsoluteY,   &Cpu::EOR, &Cpu::absolute_y,  3, 4 },
+            { 0x5A, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x5B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x5C, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x5D, Type::EOR, Mode::AbsoluteX,   &Cpu::EOR, &Cpu::absolute_x,  3, 4 },
+            { 0x5E, Type::LSR, Mode::AbsoluteX,   &Cpu::LSR, &Cpu::absolute_x,  3, 7 },
+            { 0x5F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x60, Type::RTS, Mode::Implied,     &Cpu::RTS, &Cpu::implied,     1, 6 },
+            { 0x61, Type::ADC, Mode::IndirectX,   &Cpu::ADC, &Cpu::indirect_x,  2, 6 },
+            { 0x62, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x63, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x64, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x65, Type::ADC, Mode::ZeroPage,    &Cpu::ADC, &Cpu::zero_page,   2, 3 },
+            { 0x66, Type::ROR, Mode::ZeroPage,    &Cpu::ROR, &Cpu::zero_page,   2, 5 },
+            { 0x67, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x68, Type::PLA, Mode::Implied,     &Cpu::PLA, &Cpu::implied,     1, 4 },
+            { 0x69, Type::ADC, Mode::Immediate,   &Cpu::ADC, &Cpu::immediate,   2, 2 },
+            { 0x6A, Type::ROR, Mode::Accumulator, &Cpu::ROR, &Cpu::accumulator, 1, 2 },
+            { 0x6B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x6C, Type::JMP, Mode::Indirect,    &Cpu::JMP, &Cpu::indirect,    3, 5 },
+            { 0x6D, Type::ADC, Mode::Absolute,    &Cpu::ADC, &Cpu::absolute,    3, 4 },
+            { 0x6E, Type::ROR, Mode::Absolute,    &Cpu::ROR, &Cpu::absolute,    3, 6 },
+            { 0x6F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x70, Type::BVS, Mode::Relative,    &Cpu::BVS, &Cpu::relative,    2, 2 },
+            { 0x71, Type::ADC, Mode::IndirectY,   &Cpu::ADC, &Cpu::indirect_y,  2, 5 },
+            { 0x72, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x73, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x74, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x75, Type::ADC, Mode::ZeroPageX,   &Cpu::ADC, &Cpu::zero_page_x, 2, 4 },
+            { 0x76, Type::ROR, Mode::ZeroPageX,   &Cpu::ROR, &Cpu::zero_page_x, 2, 6 },
+            { 0x77, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x78, Type::SEI, Mode::Implied,     &Cpu::SEI, &Cpu::implied,     1, 2 },
+            { 0x79, Type::ADC, Mode::AbsoluteY,   &Cpu::ADC, &Cpu::absolute_y,  3, 4 },
+            { 0x7A, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x7B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x7C, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x7D, Type::ADC, Mode::AbsoluteX,   &Cpu::ADC, &Cpu::absolute_x,  3, 4 },
+            { 0x7E, Type::ROR, Mode::AbsoluteX,   &Cpu::ROR, &Cpu::absolute_x,  3, 7 },
+            { 0x7F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x80, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x81, Type::STA, Mode::IndirectX,   &Cpu::STA, &Cpu::indirect_x,  2, 6 },
+            { 0x82, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x83, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x84, Type::STY, Mode::ZeroPage,    &Cpu::STY, &Cpu::zero_page,   2, 3 },
+            { 0x85, Type::STA, Mode::ZeroPage,    &Cpu::STA, &Cpu::zero_page,   2, 3 },
+            { 0x86, Type::STX, Mode::ZeroPage,    &Cpu::STX, &Cpu::zero_page,   2, 3 },
+            { 0x87, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x88, Type::DEY, Mode::Implied,     &Cpu::DEY, &Cpu::implied,     1, 2 },
+            { 0x89, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x8A, Type::TXA, Mode::Implied,     &Cpu::TXA, &Cpu::implied,     1, 2 },
+            { 0x8B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x8C, Type::STY, Mode::Absolute,    &Cpu::STY, &Cpu::absolute,    3, 4 },
+            { 0x8D, Type::STA, Mode::Absolute,    &Cpu::STA, &Cpu::absolute,    3, 4 },
+            { 0x8E, Type::STX, Mode::Absolute,    &Cpu::STX, &Cpu::absolute,    3, 4 },
+            { 0x8F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x90, Type::BCC, Mode::Relative,    &Cpu::BCC, &Cpu::relative,    2, 2 },
+            { 0x91, Type::STA, Mode::IndirectY,   &Cpu::STA, &Cpu::indirect_y,  2, 6 },
+            { 0x92, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x93, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x94, Type::STY, Mode::ZeroPageY,   &Cpu::STY, &Cpu::zero_page_y, 2, 4 },
+            { 0x95, Type::STA, Mode::ZeroPageX,   &Cpu::STA, &Cpu::zero_page_x, 2, 4 },
+            { 0x96, Type::STX, Mode::ZeroPageY,   &Cpu::STX, &Cpu::zero_page_y, 2, 4 },
+            { 0x97, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x98, Type::TYA, Mode::Implied,     &Cpu::TYA, &Cpu::implied,     1, 2 },
+            { 0x99, Type::STA, Mode::AbsoluteY,   &Cpu::STA, &Cpu::absolute_y,  3, 5 },
+            { 0x9A, Type::TXS, Mode::Implied,     &Cpu::TXS, &Cpu::implied,     1, 2 },
+            { 0x9B, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x9C, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x9D, Type::STA, Mode::AbsoluteX,   &Cpu::STA, &Cpu::absolute_x,  3, 5 },
+            { 0x9E, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x9F, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xA0, Type::LDY, Mode::Immediate,   &Cpu::LDY, &Cpu::immediate,   2, 2 },
+            { 0xA1, Type::LDA, Mode::IndirectX,   &Cpu::LDA, &Cpu::indirect_x,  2, 6 },
+            { 0xA2, Type::LDX, Mode::Immediate,   &Cpu::LDX, &Cpu::immediate,   2, 2 },
+            { 0xA3, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xA4, Type::LDY, Mode::ZeroPage,    &Cpu::LDY, &Cpu::zero_page,   2, 3 },
+            { 0xA5, Type::LDA, Mode::ZeroPage,    &Cpu::LDA, &Cpu::zero_page,   2, 3 },
+            { 0xA6, Type::LDX, Mode::ZeroPage,    &Cpu::LDX, &Cpu::zero_page,   2, 3 },
+            { 0xA7, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xA8, Type::TAY, Mode::Implied,     &Cpu::TAY, &Cpu::implied,     1, 2 },
+            { 0xA9, Type::LDA, Mode::Immediate,   &Cpu::LDA, &Cpu::immediate,   2, 2 },
+            { 0xAA, Type::TAX, Mode::Implied,     &Cpu::TAX, &Cpu::implied,     1, 2 },
+            { 0xAB, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xAC, Type::LDY, Mode::Absolute,    &Cpu::LDY, &Cpu::absolute,    3, 4 },
+            { 0xAD, Type::LDA, Mode::Absolute,    &Cpu::LDA, &Cpu::absolute,    3, 4 },
+            { 0xAE, Type::LDX, Mode::Absolute,    &Cpu::LDX, &Cpu::absolute,    3, 4 },
+            { 0xAF, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xB0, Type::BCS, Mode::Relative,    &Cpu::BCS, &Cpu::relative,    2, 2 },
+            { 0xB1, Type::LDA, Mode::IndirectY,   &Cpu::LDA, &Cpu::indirect_y,  2, 5 },
+            { 0x82, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x83, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xB4, Type::LDY, Mode::ZeroPageX,   &Cpu::LDY, &Cpu::zero_page_x, 2, 4 },
+            { 0xB5, Type::LDA, Mode::ZeroPageX,   &Cpu::LDA, &Cpu::zero_page_x, 2, 4 },
+            { 0xB6, Type::LDX, Mode::ZeroPageY,   &Cpu::LDX, &Cpu::zero_page_y, 2, 4 },
+            { 0x87, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xB8, Type::CLV, Mode::Implied,     &Cpu::CLV, &Cpu::implied,     1, 2 },
+            { 0xB9, Type::LDA, Mode::AbsoluteY,   &Cpu::LDA, &Cpu::absolute_y,  3, 4 },
+            { 0xBA, Type::TSX, Mode::Implied,     &Cpu::TSX, &Cpu::implied,     1, 2 },
+            { 0xBB, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xBC, Type::LDY, Mode::AbsoluteX,   &Cpu::LDY, &Cpu::absolute_x,  3, 4 },
+            { 0xBD, Type::LDA, Mode::AbsoluteX,   &Cpu::LDA, &Cpu::absolute_x,  3, 4 },
+            { 0xBE, Type::LDX, Mode::AbsoluteY,   &Cpu::LDX, &Cpu::absolute_y,  3, 4 },
+            { 0xBF, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xC0, Type::CPY, Mode::Immediate,   &Cpu::CPY, &Cpu::immediate,   2, 2 },
+            { 0xC1, Type::CMP, Mode::IndirectX,   &Cpu::CMP, &Cpu::indirect_x,  2, 6 },
+            { 0xC2, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xC3, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xC4, Type::CPY, Mode::ZeroPage,    &Cpu::CPY, &Cpu::zero_page,   2, 3 },
+            { 0xC5, Type::CMP, Mode::ZeroPage,    &Cpu::CMP, &Cpu::zero_page,   2, 3 },
+            { 0xC6, Type::DEC, Mode::ZeroPage,    &Cpu::DEC, &Cpu::zero_page,   2, 5 },
+            { 0xC7, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xC8, Type::INY, Mode::Implied,     &Cpu::INY, &Cpu::implied,     1, 2 },
+            { 0xC9, Type::CMP, Mode::Immediate,   &Cpu::CMP, &Cpu::immediate,   2, 2 },
+            { 0xCA, Type::DEX, Mode::Implied,     &Cpu::DEX, &Cpu::implied,     1, 2 },
+            { 0xCB, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xCC, Type::CPY, Mode::Absolute,    &Cpu::CPY, &Cpu::absolute,    3, 4 },
+            { 0xCD, Type::CMP, Mode::Absolute,    &Cpu::CMP, &Cpu::absolute,    3, 4 },
+            { 0xCE, Type::DEC, Mode::Absolute,    &Cpu::DEC, &Cpu::absolute,    3, 6 },
+            { 0xCF, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xD0, Type::BNE, Mode::Relative,    &Cpu::BNE, &Cpu::relative,    2, 2 },
+            { 0xD1, Type::CMP, Mode::IndirectY,   &Cpu::CMP, &Cpu::indirect_y,  2, 5 },
+            { 0xD2, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xD3, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xD4, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xD5, Type::CMP, Mode::ZeroPageX,   &Cpu::CMP, &Cpu::zero_page_x, 2, 4 },
+            { 0xD6, Type::DEC, Mode::ZeroPageX,   &Cpu::DEC, &Cpu::zero_page_x, 2, 6 },
+            { 0xD7, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xD8, Type::CLD, Mode::Implied,     &Cpu::CLD, &Cpu::implied,     1, 2 },
+            { 0xD9, Type::CMP, Mode::AbsoluteY,   &Cpu::CMP, &Cpu::absolute_y,  3, 4 },
+            { 0xDA, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xDB, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xDC, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xDD, Type::CMP, Mode::AbsoluteX,   &Cpu::CMP, &Cpu::absolute_x,  3, 4 },
+            { 0xDE, Type::DEC, Mode::AbsoluteX,   &Cpu::DEC, &Cpu::absolute_x,  3, 7 },
+            { 0xDF, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xE0, Type::CPX, Mode::Immediate,   &Cpu::CPX, &Cpu::immediate,   2, 2 },
+            { 0xE1, Type::SBC, Mode::IndirectX,   &Cpu::SBC, &Cpu::indirect_x,  2, 6 },
+            { 0xE2, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xE3, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xE4, Type::CPX, Mode::ZeroPage,    &Cpu::CPX, &Cpu::zero_page,   2, 3 },
+            { 0xE5, Type::SBC, Mode::ZeroPage,    &Cpu::SBC, &Cpu::zero_page,   2, 3 },
+            { 0xE6, Type::INC, Mode::ZeroPage,    &Cpu::INC, &Cpu::zero_page,   2, 5 },
+            { 0xE7, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xE8, Type::INX, Mode::Implied,     &Cpu::INX, &Cpu::implied,     1, 2 },
+            { 0xE9, Type::SBC, Mode::Immediate,   &Cpu::SBC, &Cpu::immediate,   2, 2 },
+            { 0xEA, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xEB, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xEC, Type::CPX, Mode::Absolute,    &Cpu::CPX, &Cpu::absolute,    3, 4 },
+            { 0xED, Type::SBC, Mode::Absolute,    &Cpu::SBC, &Cpu::absolute,    3, 4 },
+            { 0xEE, Type::INC, Mode::Absolute,    &Cpu::INC, &Cpu::absolute,    3, 6 },
+            { 0xEF, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xF0, Type::BEQ, Mode::Relative,    &Cpu::BEQ, &Cpu::relative,    2, 2 },
+            { 0xF1, Type::SBC, Mode::IndirectY,   &Cpu::SBC, &Cpu::indirect_y,  2, 5 },
+            { 0xF2, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xF3, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xF4, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xF5, Type::SBC, Mode::ZeroPageX,   &Cpu::SBC, &Cpu::zero_page_x, 2, 4 },
+            { 0xF6, Type::INC, Mode::ZeroPageX,   &Cpu::INC, &Cpu::zero_page_x, 2, 6 },
+            { 0xF7, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xF8, Type::SED, Mode::Implied,     &Cpu::SED, &Cpu::implied,     1, 2 },
+            { 0xF9, Type::SBC, Mode::AbsoluteY,   &Cpu::SBC, &Cpu::absolute_y,  3, 4 },
+            { 0xFA, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xFB, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xFC, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0xFD, Type::SBC, Mode::AbsoluteX,   &Cpu::SBC, &Cpu::absolute_x,  3, 4 },
+            { 0xFE, Type::INC, Mode::AbsoluteX,   &Cpu::INC, &Cpu::absolute_x,  3, 7 },
+            { 0xFF, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+    };
+    //@formatter:on
 }
 
 //endregion
