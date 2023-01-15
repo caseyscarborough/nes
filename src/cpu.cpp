@@ -47,6 +47,8 @@ void Cpu::cycle() {
     opcode = read(pc);
     pc++;
 
+    // TODO: Handle cycle count for each operation
+
     //@formatter:off
     switch (opcode) {
         case 0x69: { immediate();   ADC(); break; }
@@ -341,8 +343,16 @@ void Cpu::relative() {
 
 //region Instructions
 
+// Add with Carry
+// Adds the contents of a memory location to the accumulator
+// together with the carry bit. If overflow occurs the carry bit
+// is set, this enables multiple byte addition to be performed.
 void Cpu::ADC() {
-    // TODO: Come back to this.
+    uint16_t data = read(current_address);
+    uint16_t sum = a + data + status.is_set(Flag::Carry);
+    status.update(Flag::Carry | Flag::Zero | Flag::Negative, sum);
+    status.update(Flag::Overflow, ((uint16_t)a ^ data) & ((uint16_t)sum ^ data) & 0x80);
+    a = sum & 0xFF;
 }
 
 // Logical AND
@@ -427,7 +437,13 @@ void Cpu::BPL() {
 // processor status are pushed on the stack then the IRQ interrupt vector at
 // $FFFE/F is loaded into the PC and the break flag in the status set to one.
 void Cpu::BRK() {
-    // TODO: Come back to this.
+    pc++;
+    stack_push_word(pc);
+    stack_push(status.get() | Flag::Break);
+
+    uint16_t hi = read(0xFFFF) << 8;
+    uint16_t lo = read(0xFFFE);
+    pc = (hi | lo);
 }
 
 // Branch if Overflow Clear
@@ -688,8 +704,16 @@ void Cpu::RTS() {
     pc++;
 }
 
+// Subtract with Carry
+// Subtracts the contents of a memory location to the accumulator
+// together with the not of the carry bit. If overflow occurs the carry
+// bit is clear, this enables multiple byte subtraction to be performed.
 void Cpu::SBC() {
-    // TODO: Come back to this.
+    uint16_t data = ((uint16_t)read(current_address)) ^ 0x00FF;
+    uint16_t diff = a + data + status.is_set(Flag::Carry);
+    status.update(Flag::Carry | Flag::Zero | Flag::Negative, diff);
+    status.update(Flag::Overflow, (diff ^ a) & (diff ^ data) & 0x80);
+    a = diff & 0xFF;
 }
 
 // Set Carry Flag
