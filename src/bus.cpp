@@ -4,8 +4,8 @@
 Bus::Bus() = default;
 
 uint8_t Bus::read(uint16_t address) {
-    LOG_TRACE("Reading from address 0x" << std::hex << std::uppercase << address)
     if (address < 0x2000) {
+        LOG_TRACE("Reading from memory address 0x" << std::hex << std::uppercase << address)
         return memory[address];
     } else if (address <= 0x4000) {
         // TODO: read from ppu
@@ -14,6 +14,7 @@ uint8_t Bus::read(uint16_t address) {
     } else if (address < 0x4020) {
         // TODO: read from ???
     } else {
+        LOG_TRACE("Reading from PRG-ROM at 0x" << std::hex << std::uppercase << address)
         return this->cartridge->prg_read(address);
     }
 
@@ -22,8 +23,8 @@ uint8_t Bus::read(uint16_t address) {
 }
 
 void Bus::write(uint16_t address, uint8_t data) {
-    LOG_TRACE("Writing data to address 0x" << std::hex << std::uppercase << address)
     if (address < 0x2000) {
+        LOG_TRACE("Writing data to memory address 0x" << std::hex << std::uppercase << address)
         memory[address] = data;
         return;
     } else if (address < 0x4000) {
@@ -36,7 +37,9 @@ void Bus::write(uint16_t address, uint8_t data) {
         // TODO: write to ???
         return;
     } else {
+        LOG_TRACE("Writing data to PRG-ROM at 0x" << std::hex << std::uppercase << address)
         this->cartridge->prg_write(address, data);
+        return;
     }
 
     LOG_ERROR("Invalid write at address 0x" << std::hex << address)

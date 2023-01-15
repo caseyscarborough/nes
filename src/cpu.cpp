@@ -4,6 +4,7 @@
 // The stack pointer (S) points to a byte on Page 1, whose byte is
 // from 0x0100 to 0x01FF, where the last two digits are supplied by S.
 const uint16_t STACK_PAGE = 0x0100;
+const uint16_t STACK_STARTUP_STATE = 0xFD;
 
 // Convenience for status register flags
 using Flag = StatusRegister::Flag;
@@ -20,8 +21,8 @@ uint8_t Cpu::read(uint16_t address) {
 // Read two bytes from the bus.
 uint16_t Cpu::read_word(uint16_t address) {
     uint16_t lo = read(address);
-    uint16_t hi = read(address + 1) << 8;
-    return hi | lo;
+    uint16_t hi = read(address + 1);
+    return (hi << 8) | lo;
 }
 
 // Write data to the bus.
@@ -41,7 +42,7 @@ void Cpu::write_acc(uint16_t address, uint8_t data) {
 
 // The cycle for each "tick" of the processor.
 void Cpu::cycle() {
-    LOG_TRACE("Executing CPU cycle " << unsigned(total_cycles++))
+    total_cycles++;
     // We perform all necessary cycles for one operation at a single time,
     // then "sleep" for the remaining cycles
     if (cycles != 0) {
@@ -50,7 +51,7 @@ void Cpu::cycle() {
     }
 
     // Read the next operation from memory, then increment the program counter.
-    opcode = read(pc++);
+    uint8_t opcode = read(pc++);
 
     // The opcode matches the index of the instruction in the lookup table,
     // which makes it easy to look up.
@@ -59,8 +60,18 @@ void Cpu::cycle() {
     // Add the predefined number of cycles for each operation.
     cycles += current_instruction.cycles;
 
+    if (LOG_TRACE_ENABLED) {
+        std::string op_name = get_instruction_name(current_instruction.type);
+        std::string md_name = get_addressing_mode_name(current_instruction.mode);
+        LOG_TRACE("Executing opcode 0x" << std::hex << std::uppercase << opcode)
+        LOG_TRACE(op_name << " "
+                          << md_name << " 0x"
+                          << std::hex << current_address << std::dec << " ("
+                          << unsigned(current_instruction.bytes) << " bytes, "
+                          << unsigned(current_instruction.cycles) << " cycles)")
+    }
+
     // Call the addressing mode function and execute the operation.
-    LOG_TRACE("Executing opcode 0x" << std::hex << std::uppercase << opcode)
     (this->*current_instruction.ref_mode)();
     (this->*current_instruction.ref_operation)();
 
@@ -75,7 +86,7 @@ void Cpu::reset() {
     x = 0;
     y = 0;
     // Hardware stack grows downward, so we start at the top of the page (0xFF).
-    sp = 0xFF;
+    sp = STACK_STARTUP_STATE;
     status.set(Flag::InterruptDisable | Flag::Negative);
     cycles = 8;
 }
@@ -184,7 +195,8 @@ void Cpu::indirect_y() {
 // Branch instructions can only jump to a "relative" address
 // in the same area (offset between -128 and 127).
 void Cpu::relative() {
-    uint16_t offset = read(pc++);
+    // Using a signed 8-bit integer to keep the range from -128 to 127.
+    int8_t offset = read(pc++);
     current_address = offset + pc;
 }
 
@@ -200,7 +212,7 @@ void Cpu::ADC() {
     uint16_t data = read(current_address);
     uint16_t sum = a + data + status.is_set(Flag::Carry);
     status.update(Flag::Carry | Flag::Zero | Flag::Negative, sum);
-    status.update(Flag::Overflow, ((uint16_t)a ^ data) & ((uint16_t)sum ^ data) & 0x80);
+    status.update(Flag::Overflow, ((uint16_t) a ^ data) & ((uint16_t) sum ^ data) & 0x80);
     a = sum & 0xFF;
 }
 
@@ -558,7 +570,7 @@ void Cpu::RTS() {
 // together with the not of the carry bit. If overflow occurs the carry
 // bit is clear, this enables multiple byte subtraction to be performed.
 void Cpu::SBC() {
-    uint16_t data = ((uint16_t)read(current_address)) ^ 0x00FF;
+    uint16_t data = ((uint16_t) read(current_address)) ^ 0x00FF;
     uint16_t diff = a + data + status.is_set(Flag::Carry);
     status.update(Flag::Carry | Flag::Zero | Flag::Negative, diff);
     status.update(Flag::Overflow, (diff ^ a) & (diff ^ data) & 0x80);
@@ -972,6 +984,93 @@ void Cpu::initialize() {
     };
     //@formatter:on
     reset();
+}
+
+std::string Cpu::get_instruction_name(Cpu::InstructionType type) {
+    using Type = Cpu::InstructionType;
+
+    //@formatter:off
+    switch (type) {
+        case Type::ADC: return "ADC";
+        case Type::AND: return "AND";
+        case Type::ASL: return "ASL";
+        case Type::BCC: return "BCC";
+        case Type::BCS: return "BCS";
+        case Type::BEQ: return "BEQ";
+        case Type::BIT: return "BIT";
+        case Type::BMI: return "BMI";
+        case Type::BNE: return "BNE";
+        case Type::BPL: return "BPL";
+        case Type::BRK: return "BRK";
+        case Type::BVC: return "BVC";
+        case Type::BVS: return "BVS";
+        case Type::CLC: return "CLC";
+        case Type::CLD: return "CLD";
+        case Type::CLI: return "CLI";
+        case Type::CLV: return "CLV";
+        case Type::CMP: return "CMP";
+        case Type::CPX: return "CPX";
+        case Type::CPY: return "CPY";
+        case Type::DEC: return "DEC";
+        case Type::DEX: return "DEX";
+        case Type::DEY: return "DEY";
+        case Type::EOR: return "EOR";
+        case Type::INC: return "INC";
+        case Type::INX: return "INX";
+        case Type::INY: return "INY";
+        case Type::JMP: return "JMP";
+        case Type::JSR: return "JSR";
+        case Type::LDA: return "LDA";
+        case Type::LDX: return "LDX";
+        case Type::LDY: return "LDY";
+        case Type::LSR: return "LSR";
+        case Type::NOP: return "NOP";
+        case Type::ORA: return "ORA";
+        case Type::PHA: return "PHA";
+        case Type::PHP: return "PHP";
+        case Type::PLA: return "PLA";
+        case Type::PLP: return "PLP";
+        case Type::ROL: return "ROL";
+        case Type::ROR: return "ROR";
+        case Type::RTI: return "RTI";
+        case Type::RTS: return "RTS";
+        case Type::SBC: return "SBC";
+        case Type::SEC: return "SEC";
+        case Type::SED: return "SED";
+        case Type::SEI: return "SEI";
+        case Type::STA: return "STA";
+        case Type::STX: return "STX";
+        case Type::STY: return "STY";
+        case Type::TAX: return "TAX";
+        case Type::TAY: return "TAY";
+        case Type::TSX: return "TSX";
+        case Type::TXA: return "TXA";
+        case Type::TXS: return "TXS";
+        case Type::TYA: return "TYA";
+    }
+    //@formatter:on
+}
+
+std::string Cpu::get_addressing_mode_name(Cpu::AddressingMode mode) {
+    using Mode = Cpu::AddressingMode;
+
+    //@formatter:off
+    switch (mode) {
+        case Mode::Implied:     return "implied";
+        case Mode::Accumulator: return "accumulator";
+        case Mode::Immediate:   return "immediate";
+        case Mode::ZeroPage:    return "zeropage";
+        case Mode::ZeroPageX:   return "zeropage,X";
+        case Mode::ZeroPageY:   return "zeropage,y";
+        case Mode::Absolute:    return "absolute";
+        case Mode::AbsoluteX:   return "absolute,x";
+        case Mode::AbsoluteY:   return "absolute,y";
+        case Mode::Indirect:    return "indirect";
+        case Mode::IndirectX:   return "(indirect,X)";
+        case Mode::IndirectY:   return "(indirect),Y";
+        case Mode::Relative:    return "relative";
+    }
+    //@formatter:on
 }
 
 //endregion

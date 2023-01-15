@@ -53,6 +53,11 @@ class Cartridge {
     TvSystem system;
     Mirror mirror;
     uint8_t mapper_id;
+
+    static bool has_flag(uint8_t flags, uint8_t flag);
+
+public:
+    // TODO: Temporarily making these public, need to rework the mapper/cartridge to make this unnecessary.
     uint8_t prg_rom_size;
     uint8_t chr_rom_size;
     uint8_t prg_ram_size;
@@ -62,9 +67,6 @@ class Cartridge {
     std::vector<uint8_t> prg_memory;
     std::vector<uint8_t> chr_memory;
 
-    static bool has_flag(uint8_t flags, uint8_t flag);
-
-public:
     bool load(const std::string& path);
     uint8_t prg_read(uint16_t address);
     void prg_write(uint16_t address, uint8_t data);

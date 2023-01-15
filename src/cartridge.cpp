@@ -2,6 +2,8 @@
 
 #include <memory>
 #include "mappers/mapper_nrom.h"
+#include "mappers/mapper_mmc1.h"
+#include "mappers/mapper_cnrom.h"
 
 bool Cartridge::load(const std::string &path) {
     LOG("Loading ROM from path " << path)
@@ -48,15 +50,21 @@ bool Cartridge::load(const std::string &path) {
 
     // Read PRG-ROM into memory
     prg_memory.resize(0x4000 * prg_rom_size);
-    file.read(reinterpret_cast<char *>(prg_memory.data()), prg_memory.size());
+    file.read(reinterpret_cast<char *>(&prg_memory[0]), prg_memory.size());
 
     // Read CHR-ROM into memory
     chr_memory.resize(0x2000 * chr_rom_size);
-    file.read(reinterpret_cast<char *>(chr_memory.data()), chr_memory.size());
+    file.read(reinterpret_cast<char *>(&chr_memory[0]), chr_memory.size());
 
     switch (mapper_id) {
         case Mapper::NROM:
-            this->mapper = new MapperNROM();
+            mapper = new MapperNROM(this);
+            break;
+        case Mapper::MMC1:
+            mapper = new MapperMMC1();
+            break;
+        case Mapper::CNROM:
+            mapper = new MapperCNROM();
             break;
         default:
             LOG_ERROR("Mapper " << unsigned(mapper_id) << " is not implemented!")

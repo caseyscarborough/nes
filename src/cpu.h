@@ -41,7 +41,6 @@ private:
     uint8_t y;        // y register
     uint16_t pc;      // program counter
     uint8_t sp;       // stack pointer
-    uint16_t opcode;  // current operation
     uint16_t cycles;  // current cycles
     StatusRegister status; // status register (P)
     uint16_t total_cycles; // total clock cycles
@@ -62,7 +61,8 @@ private:
     void stack_push_word(uint16_t data);
     uint8_t stack_pop();
     uint16_t stack_pop_word();
-    void initialize_lookup_table();
+    std::string get_instruction_name(InstructionType type);
+    std::string get_addressing_mode_name(AddressingMode mode);
 
     //region instructions
     void ADC();
