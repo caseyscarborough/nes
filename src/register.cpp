@@ -29,7 +29,7 @@ void StatusRegister::set(StatusRegister::Flag flag) {
 }
 
 void StatusRegister::clear(StatusRegister::Flag flag) {
-    value &= flag;
+    value &= ~flag;
 }
 
 
