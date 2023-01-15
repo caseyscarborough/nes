@@ -1,7 +1,7 @@
 #include "cartridge.h"
 #include "mappers/mapper_nmrom.h"
 
-bool Cartridge::load(std::string path) {
+bool Cartridge::load(const std::string &path) {
     LOG("Loading ROM from path " << path)
     std::ifstream file(path, std::ios_base::binary | std::ios_base::in);
     if (!file || !file.is_open()) {
@@ -59,6 +59,7 @@ bool Cartridge::load(std::string path) {
             break;
         default:
             LOG_ERROR("Mapper " << unsigned(mapper_id) << " is not implemented!")
+            return false;
     }
 
     LOG("Successfully loaded ROM!")
@@ -73,4 +74,20 @@ bool Cartridge::load(std::string path) {
 
 bool Cartridge::has_flag(uint8_t flags, uint8_t flag) {
     return (flags & flag) == flag;
+}
+
+uint8_t Cartridge::prg_read(uint16_t address) {
+    return this->mapper->prg_read(address);
+}
+
+void Cartridge::prg_write(uint16_t address, uint8_t data) {
+    this->mapper->prg_write(address, data);
+}
+
+uint8_t Cartridge::chr_read(uint16_t address) {
+    return this->mapper->chr_read(address);
+}
+
+void Cartridge::chr_write(uint16_t address, uint8_t data) {
+    this->mapper->chr_write(address, data);
 }

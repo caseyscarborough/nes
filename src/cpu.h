@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include "register.h"
 
 class Bus;
 
@@ -14,16 +15,6 @@ public:
     void cycle();
     void reset();
 private:
-    // Flags for the status register
-    enum Status {
-        C = 1 << 0, // carry
-        Z = 1 << 1, // zero
-        I = 1 << 2, // interrupt disable
-        D = 1 << 3, // decimal (has no effect on the NES)
-        B = 1 << 4, // break
-        V = 1 << 6, // overflow
-        N = 1 << 7, // negative
-    };
 
     enum AddressingMode {
         Implied,
@@ -46,9 +37,9 @@ private:
     uint8_t y;        // y register
     uint16_t pc;      // program counter
     uint8_t sp;       // stack pointer
-    uint8_t status;   // status register (P)
     uint16_t opcode;  // current operation
     uint16_t cycles;  // current cycles
+    StatusRegister status; // status register (P)
     uint16_t total_cycles; // total clock cycles
 
     uint16_t current_address;    // current address
@@ -59,6 +50,13 @@ private:
     uint8_t read(uint16_t address);
     uint16_t read_word(uint16_t address);
     void write(uint16_t address, uint8_t data);
+    // same as write, except writes to the accumulator instead
+    // of memory if the current addressing mode is accumulator.
+    void write_acc(uint16_t address, uint8_t data);
+    void stack_push(uint8_t data);
+    void stack_push_word(uint16_t data);
+    uint8_t stack_pop();
+    uint16_t stack_pop_word();
 
     //region instructions
     void ADC();
@@ -117,6 +115,13 @@ private:
     void TXA();
     void TXS();
     void TYA();
+
+    // Convenience method for branch instructions (BCC, BCS, etc.).
+    void branch_if(bool condition);
+
+    // Convenience method for compare instructions (CPX, CPY, CMP).
+    void compare(uint8_t _register);
+
     //endregion instructions
 
     //region Addressing modes used for each instruction

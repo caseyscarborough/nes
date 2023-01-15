@@ -1,6 +1,13 @@
 #include "cpu.h"
 #include "bus.h"
 
+// The stack pointer (S) points to a byte on Page 1, whose byte is
+// from 0x0100 to 0x01FF, where the last two digits are supplied by S.
+const uint16_t STACK_PAGE = 0x0100;
+
+// Convenience for status register flags
+using Flag = StatusRegister::Flag;
+
 Cpu::Cpu(Bus *bus) : bus(bus) {
     reset();
 }
@@ -18,6 +25,17 @@ uint16_t Cpu::read_word(uint16_t address) {
 void Cpu::write(uint16_t address, uint8_t data) {
     bus->write(address, data);
 }
+
+// Write to the accumulator if we're in Accumulator mode,
+// otherwise write to the bus.
+void Cpu::write_acc(uint16_t address, uint8_t data) {
+    if (current_mode == Accumulator) {
+        a = data;
+    } else {
+        write(address, data);
+    }
+}
+
 
 void Cpu::cycle() {
     total_cycles++;
@@ -192,8 +210,9 @@ void Cpu::reset() {
     a = 0;
     x = 0;
     y = 0;
+    // Hardware stack grows downward, so we start at the top of the page (0xFF).
     sp = 0xFF;
-    status = Cpu::Status::I | Cpu::Status::N;
+    status.set(Flag::InterruptDisable | Flag::Negative);
     cycles = 8;
 }
 
@@ -323,227 +342,495 @@ void Cpu::relative() {
 //region Instructions
 
 void Cpu::ADC() {
-
+    // TODO: Come back to this.
 }
 
+// Logical AND
+// A logical AND is performed, bit by bit, on the accumulator
+// contents using the contents of a byte of memory.
 void Cpu::AND() {
-
+    uint8_t data = read(current_address);
+    a &= data;
+    status.update(Flag::Zero | Flag::Negative, a);
 }
 
+// Arithmetic Shift Left
+// Shifts all the bits of the accumulator or memory contents one
+// bit left, effectively multiplying by two.
 void Cpu::ASL() {
-
+    // Read from the current address and shift left.
+    uint16_t data = read(current_address) << 1;
+    write_acc(current_address, data & 0xFF);
+    status.update(Flag::Carry | Flag::Zero | Flag::Negative, data);
 }
 
+// Branch if Carry Clear
+// If the carry flag is clear then add the relative displacement to the
+// program counter to cause a branch to a new location.
 void Cpu::BCC() {
-
+    branch_if(status.is_clear(Flag::Carry));
 }
 
+// Branch if Carry Set
+// If the carry flag is set then add the relative displacement to the
+// program counter to cause a branch to a new location.
 void Cpu::BCS() {
-
+    branch_if(status.is_set(Flag::Carry));
 }
 
+// Branch if Equal
+// If the zero flag is set then add the relative displacement to the
+// program counter to cause a branch to a new location.
 void Cpu::BEQ() {
-
+    branch_if(status.is_set(Flag::Zero));
 }
 
+// Bit Test
+// Used to test if one or more bits are set in a target memory location.
+// The mask pattern in A is ANDed with the value in memory to set or clear
+// the zero flag, but the result is not kept. Bits 7 and 6 of the value
+// from memory are copied into the N and V flags.
 void Cpu::BIT() {
+    // AND the value in the accumulator with the value in memory.
+    uint8_t data = a & read(current_address);
 
+    // Copy the 6th bit from the resulting data into the V flag.
+    status.update(Flag::Overflow, data & 0x40);
+
+    // Update negative and zero register flags.
+    status.update(Flag::Negative | Flag::Zero, data);
 }
 
+// Branch if Minus
+// If the negative flag is set, then add the relative displacement to the
+// program counter to cause a branch to a new location.
 void Cpu::BMI() {
-
+    branch_if(status.is_set(Flag::Negative));
 }
 
+// Branch if Not Equal
+// If the zero flag is clear then add the relative displacement to the
+// program counter to cause a branch to a new location.
 void Cpu::BNE() {
-
+    branch_if(status.is_clear(Flag::Zero));
 }
 
+// Branch if Positive
+// If the negative flag is clear then add the relative displacement to the
+// program counter to cause a branch to a new location.
 void Cpu::BPL() {
-
+    branch_if(status.is_clear(Flag::Negative));
 }
 
+// Force Interrupt
+// Forces the generation of an interrupt request. The program counter and
+// processor status are pushed on the stack then the IRQ interrupt vector at
+// $FFFE/F is loaded into the PC and the break flag in the status set to one.
 void Cpu::BRK() {
-
+    // TODO: Come back to this.
 }
 
+// Branch if Overflow Clear
+// If the overflow flag is clear then add the relative displacement to the
+// program counter to cause a branch to a new location.
 void Cpu::BVC() {
-
+    branch_if(status.is_clear(Flag::Overflow));
 }
 
+// Branch if Overflow Set
+// If the overflow flag is set then add the relative displacement to the
+// program counter to cause a branch to a new location.
 void Cpu::BVS() {
-
+    branch_if(status.is_set(Flag::Overflow));
 }
 
+// Clear Carry Flag
+// Set the Carry flag (C) to zero.
 void Cpu::CLC() {
-
+    status.clear(Flag::Carry);
 }
 
+// Clear Decimal Flag
+// Set the decimal flag (D) to zero.
 void Cpu::CLD() {
-
+    status.clear(Flag::Decimal);
 }
 
+// Clear Interrupt Disable
+// Clears the interrupt disable flag (I) allowing normal interrupt
+// requests to be serviced.
 void Cpu::CLI() {
-
+    status.clear(Flag::InterruptDisable);
 }
 
+// Clear Overflow Flag
+// Set the overflow flag (V) to zero.
 void Cpu::CLV() {
-
+    status.clear(Flag::Overflow);
 }
 
+// Compare
+// Compares the contents of the accumulator with another memory held
+// value and sets the zero and carry flags as appropriate.
 void Cpu::CMP() {
-
+    compare(a);
 }
 
+// Compare X Register
+// Compares the contents of the X register with another memory held
+// value and sets the zero and carry flags as appropriate.
 void Cpu::CPX() {
-
+    compare(x);
 }
 
+// Compare Y Register
+// Compares the contents of the Y register with another memory held
+// value and sets the zero and carry flags as appropriate.
 void Cpu::CPY() {
-
+    compare(y);
 }
 
+// Decrement Memory
+// Subtracts one from the value held at a specified memory location
+// setting the zero and negative flags as appropriate.
 void Cpu::DEC() {
-
+    uint8_t data = read(current_address) - 1;
+    write(current_address, data);
+    status.update(Flag::Zero | Flag::Negative, data);
 }
 
+// Decrement X Register
+// Subtracts one from the X register setting the zero and negative
+// flags as appropriate.
 void Cpu::DEX() {
-
+    x--;
+    status.update(Flag::Zero | Flag::Negative, x);
 }
 
+// Decrement Y Register
+// Subtracts one from the Y register setting the zero and negative
+// flags as appropriate.
 void Cpu::DEY() {
-
+    y--;
+    status.update(Flag::Zero | Flag::Negative, y);
 }
 
+// Exclusive OR
+// An exclusive OR is performed, bit by bit, on the accumulator
+// contents using the contents of a byte of memory.
 void Cpu::EOR() {
-
+    uint8_t data = read(current_address);
+    a ^= data;
+    status.update(Flag::Zero | Flag::Negative, a);
 }
 
+// Increment Memory
+// Adds one to the value held at a specified memory location
+// setting the zero and negative flags as appropriate.
 void Cpu::INC() {
-
+    uint8_t data = read(current_address) + 1;
+    write(current_address, data);
+    status.update(Flag::Zero | Flag::Negative, data);
 }
 
+// Increment X Register
+// Adds one to the X register setting the zero and negative
+// flags as appropriate.
 void Cpu::INX() {
-
+    x++;
+    status.update(Flag::Zero | Flag::Negative, x);
 }
 
+// Increment Y Register
+// Adds one to the Y register setting the zero and negative
+// flags as appropriate.
 void Cpu::INY() {
-
+    y++;
+    status.update(Flag::Zero | Flag::Negative, y);
 }
 
+// Jump
+// Sets the program counter to the address specified by the operand.
 void Cpu::JMP() {
-
+    pc = current_address;
 }
 
+// Jump to Subroutine
+// Pushes the address (minus one) of the return point on to the stack
+// and then sets the program counter to the target memory address.
 void Cpu::JSR() {
-
+    pc--;
+    stack_push_word(pc);
+    pc = read(pc);
 }
 
+// Load Accumulator
+// Loads a byte of memory into the accumulator setting the zero and
+// negative flags as appropriate.
 void Cpu::LDA() {
-
+    a = read(current_address);
+    status.update(Flag::Zero | Flag::Negative, a);
 }
 
+// Load X Register
+// Loads a byte of memory into the X register setting the zero and
+// negative flags as appropriate.
 void Cpu::LDX() {
-
+    x = read(current_address);
+    status.update(Flag::Zero | Flag::Negative, x);
 }
 
+// Load Y Register
+// Loads a byte of memory into the Y register setting the zero and
+// negative flags as appropriate.
 void Cpu::LDY() {
-
+    y = read(current_address);
+    status.update(Flag::Zero | Flag::Negative, y);
 }
 
+// Logical Shift Right
+// Each of the bits in A or M is shift one place to the right. The bit that
+// was in bit 0 is shifted into the carry flag. Bit 7 is set to zero.
 void Cpu::LSR() {
+    uint8_t data = read(current_address);
 
+    // Set the Carry flag to the value in the first bit before shifting.
+    status.update(StatusRegister::Carry, data & 0x1);
+
+    data >>= 1;
+    status.update(Flag::Zero | Flag::Negative, data);
+    write_acc(current_address, data);
 }
 
+// No Operation
+// The NOP instruction causes no changes to the processor other than the
+// normal incrementing of the program counter to the next instruction.
 void Cpu::NOP() {
-
+    // Nothing to do
 }
 
+// Logical Inclusive OR
+// An inclusive OR is performed, bit by bit, on the accumulator
+// contents using the contents of a byte of memory.
 void Cpu::ORA() {
-
+    uint8_t data = read(current_address);
+    a |= data;
+    status.update(Flag::Zero | Flag::Negative, a);
 }
 
+// Push Accumulator
+// Pushes a copy of the accumulator on to the stack.
 void Cpu::PHA() {
-
+    stack_push(a);
 }
 
+// Push Processor Status onto Stack
+// Pushes a copy of the status register on to the stack.
+// The status register will be pushed with the break flag
+// and bit 5 (unused) set to 1.
 void Cpu::PHP() {
-
+    stack_push(status.get() | Flag::Break | Flag::Unused);
 }
 
+// Pull Accumulator from Stack
+// Pulls an 8 bit value from the stack and into the accumulator.
+// The zero and negative flags are set as appropriate.
 void Cpu::PLA() {
-
+    a = stack_pop();
+    status.update(Flag::Zero | Flag::Negative, a);
 }
 
+// Pull Processor Status from Stack
+// Pulls an 8 bit value from the stack and into the processor flags.
+// The flags will take on new states as determined by the value pulled.
+// The status register will be pulled with the break flag and bit 5 ignored.
 void Cpu::PLP() {
-
+    status.set(stack_pop());
 }
 
+// Rotate Left
+// Move each of the bits in either A or M one place to the left. Bit 0 is
+// filled with the current value of the carry flag whilst the old bit 7
+// becomes the new carry flag value.
 void Cpu::ROL() {
-
+    uint16_t data = read(current_address);
+    data = (data << 1) | status.is_set(Flag::Carry);
+    status.update(Flag::Carry | Flag::Zero | Flag::Negative, data);
+    write_acc(current_address, data & 0xFF);
 }
 
+// Rotate Right
+// Move each of the bits in either A or M one place to the right. Bit 7 is
+// filled with the current value of the carry flag whilst the old bit 0
+// becomes the new carry flag value.
 void Cpu::ROR() {
-
+    uint8_t data = read(current_address);
+    uint8_t shifted = status.is_set(Flag::Carry) << 7 | (data >> 7);
+    status.update(Flag::Carry, data & 0x01);
+    status.update(Flag::Zero | Flag::Negative, shifted);
+    write_acc(current_address, shifted);
 }
 
+// Return from Interrupt
+// Used at the end of an interrupt processing routine. It pulls the
+// processor flags from the stack followed by the program counter.
 void Cpu::RTI() {
-
+    status.set(stack_pop());
+    status.set(status.get() & ~Flag::Break & ~Flag::Unused);
+    pc = stack_pop() | (stack_pop() << 8);
 }
 
+// Return from Subroutine
+// Used at the end of a subroutine to return to the calling routine.
+// It pulls the program counter (minus one) from the stack.
 void Cpu::RTS() {
-
+    pc = stack_pop_word();
+    pc++;
 }
 
 void Cpu::SBC() {
-
+    // TODO: Come back to this.
 }
 
+// Set Carry Flag
 void Cpu::SEC() {
-
+    status.set(Flag::Carry);
 }
 
+// Set Decimal Flag
 void Cpu::SED() {
-
+    status.set(Flag::Decimal);
 }
 
+// Set Interrupt Disable
 void Cpu::SEI() {
-
+    status.set(Flag::InterruptDisable);
 }
 
+// Store Accumulator
+// Stores the contents of the accumulator into memory.
 void Cpu::STA() {
-
+    write(current_address, a);
 }
 
+// Store X Register
+// Stores the contents of the X register into memory.
 void Cpu::STX() {
-
+    write(current_address, x);
 }
 
+// Store Y Register
+// Stores the contents of the Y register into memory.
 void Cpu::STY() {
-
+    write(current_address, y);
 }
 
+// Transfer Accumulator to X
+// Copies the current contents of the accumulator into the X
+// register and sets the zero and negative flags as appropriate.
 void Cpu::TAX() {
-
+    x = a;
+    status.update(Flag::Zero | Flag::Negative, x);
 }
 
+// Transfer Accumulator to Y
+// Copies the current contents of the accumulator into the Y
+// register and sets the zero and negative flags as appropriate.
 void Cpu::TAY() {
+    y = a;
+    status.update(Flag::Zero | Flag::Negative, y);
 
 }
 
+// Transfer Stack Pointer to X
+// Copies the current contents of the stack register into the X
+// register and sets the zero and negative flags as appropriate.
 void Cpu::TSX() {
-
+    x = sp;
+    status.update(Flag::Zero | Flag::Negative, x);
 }
 
+// Transfer X to Accumulator
+// Copies the current contents of the X register into the accumulator
+// and sets the zero and negative flags as appropriate.
 void Cpu::TXA() {
-
+    a = x;
+    status.update(Flag::Zero | Flag::Negative, a);
 }
 
+// Transfer X to Stack Pointer
+// Copies the current contents of the X register into the stack register.
 void Cpu::TXS() {
-
+    sp = x;
 }
 
+// Transfer Y to Accumulator
+// Copies the current contents of the Y register into the accumulator
+// and sets the zero and negative flags as appropriate.
 void Cpu::TYA() {
+    a = y;
+    status.update(Flag::Zero | Flag::Negative, y);
+}
 
+// Convenience method for branching instructions (e.g. BCS, BCC, BNE).
+// Performs the branching operation if the condition is met.
+void Cpu::branch_if(bool condition) {
+    if (!condition) {
+        return;
+    }
+
+    // Add one cycle if the branch succeeds.
+    cycles++;
+
+    // Add another cycle if a page boundary was crossed.
+    if ((current_address & 0xFF00) != (pc & 0xFF00)) {
+        cycles++;
+    }
+
+    // The current address has already been offset due
+    // to relative addressing (see relative()), we just
+    // need to assign it to the program counter.
+    pc = current_address;
+}
+
+// Convenience method for compare instructions (e.g. CMP, CPX, CPY).
+// Compares the data read from memory with the value in the specified
+// register and sets the Carry, Zero, and Negative flags appropriately.
+void Cpu::compare(uint8_t _register) {
+    uint8_t data = read(current_address);
+    status.update(Flag::Carry, _register >= data);
+
+    uint8_t diff = _register - data;
+    status.update(Flag::Zero | Flag::Negative, diff);
+}
+
+// Push a single byte onto the stack.
+void Cpu::stack_push(uint8_t data) {
+    write(STACK_PAGE | sp, data);
+    // decrement the stack pointer because the 6502 stack fills downwards.
+    sp--;
+}
+
+// Push two bytes onto the stack.
+void Cpu::stack_push_word(uint16_t data) {
+    stack_push((data >> 8) & 0xFF);
+    stack_push(data & 0xFF);
+}
+
+// Pop a single byte from the stack.
+uint8_t Cpu::stack_pop() {
+    // Increment the stack pointer because the 6502 stack fills downwards.
+    // We increment before reading because the current SP points to an
+    // empty location in memory, the previous SP is the "top" of the stack.
+    sp++;
+    read(STACK_PAGE | sp);
+}
+
+// Pop two bytes from the stack.
+uint16_t Cpu::stack_pop_word() {
+    uint8_t low = stack_pop();
+    uint16_t hi = (stack_pop() << 8);
+    return (hi | low);
 }
 
 //endregion

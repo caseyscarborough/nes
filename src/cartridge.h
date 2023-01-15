@@ -65,7 +65,11 @@ class Cartridge {
     static bool has_flag(uint8_t flags, uint8_t flag);
 
 public:
-    bool load(std::string path);
+    bool load(const std::string& path);
+    uint8_t prg_read(uint16_t address);
+    void prg_write(uint16_t address, uint8_t data);
+    uint8_t chr_read(uint16_t address);
+    void chr_write(uint16_t address, uint8_t data);
 };
 
 
