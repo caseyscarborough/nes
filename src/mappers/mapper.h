@@ -7,7 +7,7 @@
 class Mapper {
 public:
     enum Type {
-        NMROM = 0,
+        NROM = 0,
     };
     virtual uint8_t prg_read(uint16_t address) = 0;
     virtual void prg_write(uint16_t address, uint8_t data) = 0;

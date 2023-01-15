@@ -1,7 +1,7 @@
 #include "cartridge.h"
 
 #include <memory>
-#include "mappers/mapper_nmrom.h"
+#include "mappers/mapper_nrom.h"
 
 bool Cartridge::load(const std::string &path) {
     LOG("Loading ROM from path " << path)
@@ -55,8 +55,8 @@ bool Cartridge::load(const std::string &path) {
     file.read(reinterpret_cast<char *>(chr_memory.data()), chr_memory.size());
 
     switch (mapper_id) {
-        case Mapper::NMROM:
-            this->mapper = new MapperNMROM();
+        case Mapper::NROM:
+            this->mapper = new MapperNROM();
             break;
         default:
             LOG_ERROR("Mapper " << unsigned(mapper_id) << " is not implemented!")
