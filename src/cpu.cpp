@@ -823,7 +823,7 @@ uint8_t Cpu::stack_pop() {
     // We increment before reading because the current SP points to an
     // empty location in memory, the previous SP is the "top" of the stack.
     sp++;
-    read(STACK_PAGE | sp);
+    return read(STACK_PAGE | sp);
 }
 
 // Pop two bytes from the stack.
