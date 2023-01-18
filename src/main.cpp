@@ -17,8 +17,10 @@ int main(int argc, char **argv) {
         return 1;
     }
     auto *bus = new Bus();
+    auto *ppu = new Ppu();
     auto *cpu = new Cpu(bus);
     bus->connect_cpu(cpu);
+    bus->connect_ppu(ppu);
     bus->load_cartridge(cartridge);
     cpu->initialize();
 

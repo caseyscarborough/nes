@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "register.h"
+#include "registers/status.h"
 
 class Bus;
 
@@ -30,9 +30,9 @@ private:
         Absolute, AbsoluteX, AbsoluteY, Indirect, IndirectX, IndirectY, Relative,
     };
     enum class InterruptType {
-        NMI = 0xFFFA,
-        IRQ = 0xFFFE,
-        BRK = 0xFFFE,
+        NMI,
+        IRQ,
+        BRK,
     };
 
     struct Instruction {

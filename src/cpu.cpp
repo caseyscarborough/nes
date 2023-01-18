@@ -64,7 +64,7 @@ void Cpu::cycle() {
     if (LOG_TRACE_ENABLED) {
         std::string op_name = get_instruction_name(current_instruction.type);
         std::string md_name = get_addressing_mode_name(current_instruction.mode);
-        LOG_TRACE("Executing opcode 0x" << std::hex << std::uppercase << opcode)
+        LOG_TRACE("Executing opcode 0x" << std::hex << std::uppercase << unsigned(opcode))
         LOG_TRACE(op_name << " "
                           << md_name << " 0x"
                           << std::hex << current_address << std::dec << " ("
@@ -224,8 +224,8 @@ void Cpu::relative() {
 void Cpu::ADC() {
     uint16_t data = read(current_address);
     uint16_t sum = a + data + status.is_set(Flag::Carry);
-    status.update(Flag::Carry | Flag::Zero | Flag::Negative, sum);
-    status.update(Flag::Overflow, ((uint16_t) a ^ data) & ((uint16_t) sum ^ data) & 0x80);
+    status.set_defaults(Flag::Carry | Flag::Zero | Flag::Negative, sum);
+    status.set_if(Flag::Overflow, ((uint16_t) a ^ data) & ((uint16_t) sum ^ data) & 0x80);
     a = sum & 0xFF;
 }
 
@@ -235,7 +235,7 @@ void Cpu::ADC() {
 void Cpu::AND() {
     uint8_t data = read(current_address);
     a &= data;
-    status.update(Flag::Zero | Flag::Negative, a);
+    status.set_defaults(Flag::Zero | Flag::Negative, a);
 }
 
 // Arithmetic Shift Left
@@ -245,7 +245,7 @@ void Cpu::ASL() {
     // Read from the current address and shift left.
     uint16_t data = read(current_address) << 1;
     write_acc(current_address, data & 0xFF);
-    status.update(Flag::Carry | Flag::Zero | Flag::Negative, data);
+    status.set_defaults(Flag::Carry | Flag::Zero | Flag::Negative, data);
 }
 
 // Branch if Carry Clear
@@ -279,10 +279,10 @@ void Cpu::BIT() {
     uint8_t data = a & read(current_address);
 
     // Copy the 6th bit from the resulting data into the V flag.
-    status.update(Flag::Overflow, data & 0x40);
+    status.set_if(Flag::Overflow, data & 0x40);
 
     // Update negative and zero register flags.
-    status.update(Flag::Negative | Flag::Zero, data);
+    status.set_defaults(Flag::Negative | Flag::Zero, data);
 }
 
 // Branch if Minus
@@ -380,7 +380,7 @@ void Cpu::CPY() {
 void Cpu::DEC() {
     uint8_t data = read(current_address) - 1;
     write(current_address, data);
-    status.update(Flag::Zero | Flag::Negative, data);
+    status.set_defaults(Flag::Zero | Flag::Negative, data);
 }
 
 // Decrement X Register
@@ -388,7 +388,7 @@ void Cpu::DEC() {
 // flags as appropriate.
 void Cpu::DEX() {
     x--;
-    status.update(Flag::Zero | Flag::Negative, x);
+    status.set_defaults(Flag::Zero | Flag::Negative, x);
 }
 
 // Decrement Y Register
@@ -396,7 +396,7 @@ void Cpu::DEX() {
 // flags as appropriate.
 void Cpu::DEY() {
     y--;
-    status.update(Flag::Zero | Flag::Negative, y);
+    status.set_defaults(Flag::Zero | Flag::Negative, y);
 }
 
 // Exclusive OR
@@ -405,7 +405,7 @@ void Cpu::DEY() {
 void Cpu::EOR() {
     uint8_t data = read(current_address);
     a ^= data;
-    status.update(Flag::Zero | Flag::Negative, a);
+    status.set_defaults(Flag::Zero | Flag::Negative, a);
 }
 
 // Increment Memory
@@ -414,7 +414,7 @@ void Cpu::EOR() {
 void Cpu::INC() {
     uint8_t data = read(current_address) + 1;
     write(current_address, data);
-    status.update(Flag::Zero | Flag::Negative, data);
+    status.set_defaults(Flag::Zero | Flag::Negative, data);
 }
 
 // Increment X Register
@@ -422,7 +422,7 @@ void Cpu::INC() {
 // flags as appropriate.
 void Cpu::INX() {
     x++;
-    status.update(Flag::Zero | Flag::Negative, x);
+    status.set_defaults(Flag::Zero | Flag::Negative, x);
 }
 
 // Increment Y Register
@@ -430,7 +430,7 @@ void Cpu::INX() {
 // flags as appropriate.
 void Cpu::INY() {
     y++;
-    status.update(Flag::Zero | Flag::Negative, y);
+    status.set_defaults(Flag::Zero | Flag::Negative, y);
 }
 
 // Jump
@@ -453,7 +453,7 @@ void Cpu::JSR() {
 // negative flags as appropriate.
 void Cpu::LDA() {
     a = read(current_address);
-    status.update(Flag::Zero | Flag::Negative, a);
+    status.set_defaults(Flag::Zero | Flag::Negative, a);
 }
 
 // Load X Register
@@ -461,7 +461,7 @@ void Cpu::LDA() {
 // negative flags as appropriate.
 void Cpu::LDX() {
     x = read(current_address);
-    status.update(Flag::Zero | Flag::Negative, x);
+    status.set_defaults(Flag::Zero | Flag::Negative, x);
 }
 
 // Load Y Register
@@ -469,7 +469,7 @@ void Cpu::LDX() {
 // negative flags as appropriate.
 void Cpu::LDY() {
     y = read(current_address);
-    status.update(Flag::Zero | Flag::Negative, y);
+    status.set_defaults(Flag::Zero | Flag::Negative, y);
 }
 
 // Logical Shift Right
@@ -479,10 +479,10 @@ void Cpu::LSR() {
     uint8_t data = read(current_address);
 
     // Set the Carry flag to the value in the first bit before shifting.
-    status.update(StatusRegister::Carry, data & 0x1);
+    status.set_if(StatusRegister::Carry, data & 0x1);
 
     data >>= 1;
-    status.update(Flag::Zero | Flag::Negative, data);
+    status.set_defaults(Flag::Zero | Flag::Negative, data);
     write_acc(current_address, data);
 }
 
@@ -499,7 +499,7 @@ void Cpu::NOP() {
 void Cpu::ORA() {
     uint8_t data = read(current_address);
     a |= data;
-    status.update(Flag::Zero | Flag::Negative, a);
+    status.set_defaults(Flag::Zero | Flag::Negative, a);
 }
 
 // Push Accumulator
@@ -513,7 +513,7 @@ void Cpu::PHA() {
 // The status register will be pushed with the break flag
 // and bit 5 (unused) set to 1.
 void Cpu::PHP() {
-    stack_push(status.get() | Flag::Break | Flag::Unused);
+    stack_push(status.get_value() | Flag::Break | Flag::Unused);
 }
 
 // Pull Accumulator from Stack
@@ -521,7 +521,7 @@ void Cpu::PHP() {
 // The zero and negative flags are set as appropriate.
 void Cpu::PLA() {
     a = stack_pop();
-    status.update(Flag::Zero | Flag::Negative, a);
+    status.set_defaults(Flag::Zero | Flag::Negative, a);
 }
 
 // Pull Processor Status from Stack
@@ -529,7 +529,7 @@ void Cpu::PLA() {
 // The flags will take on new states as determined by the value pulled.
 // The status register will be pulled with the break flag and bit 5 ignored.
 void Cpu::PLP() {
-    status.set(stack_pop());
+    status.set_value(stack_pop());
 }
 
 // Rotate Left
@@ -539,7 +539,7 @@ void Cpu::PLP() {
 void Cpu::ROL() {
     uint16_t data = read(current_address);
     data = (data << 1) | status.is_set(Flag::Carry);
-    status.update(Flag::Carry | Flag::Zero | Flag::Negative, data);
+    status.set_defaults(Flag::Carry | Flag::Zero | Flag::Negative, data);
     write_acc(current_address, data & 0xFF);
 }
 
@@ -550,8 +550,8 @@ void Cpu::ROL() {
 void Cpu::ROR() {
     uint8_t data = read(current_address);
     uint8_t shifted = status.is_set(Flag::Carry) << 7 | (data >> 7);
-    status.update(Flag::Carry, data & 0x01);
-    status.update(Flag::Zero | Flag::Negative, shifted);
+    status.set_if(Flag::Carry, data & 0x01);
+    status.set_defaults(Flag::Zero | Flag::Negative, shifted);
     write_acc(current_address, shifted);
 }
 
@@ -560,10 +560,10 @@ void Cpu::ROR() {
 // processor flags from the stack followed by the program counter.
 void Cpu::RTI() {
     // Set the status back to the previous state, which was stored on the stack
-    status.set(stack_pop());
+    status.set_value(stack_pop());
     
     // Clear the B and U flags
-    status.set(status.get() & ~Flag::Break & ~Flag::Unused);
+    status.set_value(status.get_value() & ~Flag::Break & ~Flag::Unused);
     
     // Retrieve the previous program counter, which was stored on the stack
     pc = stack_pop_word();
@@ -584,8 +584,8 @@ void Cpu::RTS() {
 void Cpu::SBC() {
     uint16_t data = ((uint16_t) read(current_address)) ^ 0x00FF;
     uint16_t diff = a + data + status.is_set(Flag::Carry);
-    status.update(Flag::Carry | Flag::Zero | Flag::Negative, diff);
-    status.update(Flag::Overflow, (diff ^ a) & (diff ^ data) & 0x80);
+    status.set_defaults(Flag::Carry | Flag::Zero | Flag::Negative, diff);
+    status.set_if(Flag::Overflow, (diff ^ a) & (diff ^ data) & 0x80);
     a = diff & 0xFF;
 }
 
@@ -627,7 +627,7 @@ void Cpu::STY() {
 // register and sets the zero and negative flags as appropriate.
 void Cpu::TAX() {
     x = a;
-    status.update(Flag::Zero | Flag::Negative, x);
+    status.set_defaults(Flag::Zero | Flag::Negative, x);
 }
 
 // Transfer Accumulator to Y
@@ -635,7 +635,7 @@ void Cpu::TAX() {
 // register and sets the zero and negative flags as appropriate.
 void Cpu::TAY() {
     y = a;
-    status.update(Flag::Zero | Flag::Negative, y);
+    status.set_defaults(Flag::Zero | Flag::Negative, y);
 
 }
 
@@ -644,7 +644,7 @@ void Cpu::TAY() {
 // register and sets the zero and negative flags as appropriate.
 void Cpu::TSX() {
     x = sp;
-    status.update(Flag::Zero | Flag::Negative, x);
+    status.set_defaults(Flag::Zero | Flag::Negative, x);
 }
 
 // Transfer X to Accumulator
@@ -652,7 +652,7 @@ void Cpu::TSX() {
 // and sets the zero and negative flags as appropriate.
 void Cpu::TXA() {
     a = x;
-    status.update(Flag::Zero | Flag::Negative, a);
+    status.set_defaults(Flag::Zero | Flag::Negative, a);
 }
 
 // Transfer X to Stack Pointer
@@ -666,7 +666,7 @@ void Cpu::TXS() {
 // and sets the zero and negative flags as appropriate.
 void Cpu::TYA() {
     a = y;
-    status.update(Flag::Zero | Flag::Negative, y);
+    status.set_defaults(Flag::Zero | Flag::Negative, y);
 }
 
 // endregion
@@ -699,10 +699,10 @@ void Cpu::branch_if(bool condition) {
 // register and sets the Carry, Zero, and Negative flags appropriately.
 void Cpu::compare(uint8_t _register) {
     uint8_t data = read(current_address);
-    status.update(Flag::Carry, _register >= data);
+    status.set_if(Flag::Carry, _register >= data);
 
     uint8_t diff = _register - data;
-    status.update(Flag::Zero | Flag::Negative, diff);
+    status.set_defaults(Flag::Zero | Flag::Negative, diff);
 }
 
 // Push a single byte onto the stack.
@@ -741,6 +741,8 @@ uint16_t Cpu::stack_pop_word() {
 void Cpu::interrupt(Cpu::InterruptType type) {
     // Don't allow an IRQ to occur if the I flag is set in the status register
     if (type == InterruptType::IRQ && status.is_set(Flag::InterruptDisable)) {
+        // Still need to add a cycle in this case since this took 1 cycle.
+        cycles++;
         return;
     }
 
@@ -754,14 +756,18 @@ void Cpu::interrupt(Cpu::InterruptType type) {
 
     // Set the I flag and set the B flag if it's a BRK (software) interrupt
     status.set(Flag::InterruptDisable | Flag::Unused);
-    status.update(Flag::Break, type == InterruptType::BRK);
+    status.set_if(Flag::Break, type == InterruptType::BRK);
 
     // Save the state of the status register onto the stack
-    stack_push(status.get());
+    stack_push(status.get_value());
+
+    // The interrupt vector for NMI is 0xFFFA and 0xFFFE for BRK and IRQ.
+    uint16_t vector = type == InterruptType::NMI ? 0xFFFA : 0xFFFE;
 
     // Set the program counter to the vector defined by the interrupt type
-    pc = read_word(static_cast<uint16_t>(type));
+    pc = read_word(vector);
 
+    // An interrupt takes 7 cycles including this cycle.
     cycles += 7;
 }
 

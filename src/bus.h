@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include "cpu.h"
 #include "cartridge.h"
+#include "ppu.h"
 
 class Bus {
 public:
@@ -14,8 +15,10 @@ public:
     void cycle();
     void load_cartridge(Cartridge * cartridge);
     void connect_cpu(Cpu* cpu);
+    void connect_ppu(Ppu* ppu);
 private:
     Cpu *cpu;
+    Ppu *ppu;
     Cartridge *cartridge;
     uint8_t memory[8192];           // 0x0000 -> 0x07FF (mirrored 3 additional times)
 };
