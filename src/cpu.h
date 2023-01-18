@@ -16,6 +16,8 @@ public:
     void initialize();
     void cycle();
     void reset();
+    void nmi();
+    void irq();
 private:
     enum class InstructionType {
         ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC,
@@ -27,6 +29,12 @@ private:
         Implied, Accumulator, Immediate, ZeroPage, ZeroPageX, ZeroPageY,
         Absolute, AbsoluteX, AbsoluteY, Indirect, IndirectX, IndirectY, Relative,
     };
+    enum class InterruptType {
+        NMI = 0xFFFA,
+        IRQ = 0xFFFE,
+        BRK = 0xFFFE,
+    };
+
     struct Instruction {
         uint8_t opcode;
         InstructionType type;
@@ -36,6 +44,7 @@ private:
         uint8_t bytes;
         uint8_t cycles;
     };
+
     uint8_t a;        // accumulator
     uint8_t x;        // x register
     uint8_t y;        // y register
@@ -127,6 +136,9 @@ private:
 
     // Convenience method for compare instructions (CPX, CPY, CMP).
     void compare(uint8_t _register);
+
+    // Convenience method for working with interrupts (NMI, IRQ, BRK)
+    void interrupt(InterruptType type);
 
     //endregion instructions
 

@@ -4,7 +4,8 @@
 // The stack pointer (S) points to a byte on Page 1, whose byte is
 // from 0x0100 to 0x01FF, where the last two digits are supplied by S.
 const uint16_t STACK_PAGE = 0x0100;
-const uint16_t STACK_STARTUP_STATE = 0xFD;
+const uint8_t STACK_STARTUP_STATE = 0xFF;
+const uint16_t RESET_VECTOR = 0xFFFC;
 
 // Convenience for status register flags
 using Flag = StatusRegister::Flag;
@@ -81,7 +82,7 @@ void Cpu::cycle() {
 
 // Reset the CPU to it's initial state.
 void Cpu::reset() {
-    pc = read_word(0xFFFC);
+    pc = read_word(RESET_VECTOR);
     a = 0;
     x = 0;
     y = 0;
@@ -91,7 +92,19 @@ void Cpu::reset() {
     cycles = 8;
 }
 
-//region Addressing Modes
+// The NMI interrupt is a non-maskable interrupt, meaning that it cannot
+// be ignored or disabled by the CPU.
+void Cpu::nmi() {
+    interrupt(InterruptType::NMI);
+}
+
+// The IRQ interrupt is a maskable interrupt, meaning that it can be ignored
+// or disabled by the CPU (using the 'I' flag in the status register).
+void Cpu::irq() {
+    interrupt(InterruptType::IRQ);
+}
+
+// region Addressing Modes
 
 // Operate directly on one or more registers internal to the CPU.
 // This is for operations like CLC (Clear Carry Flag), TXA (transfer
@@ -196,13 +209,13 @@ void Cpu::indirect_y() {
 // in the same area (offset between -128 and 127).
 void Cpu::relative() {
     // Using a signed 8-bit integer to keep the range from -128 to 127.
-    int8_t offset = read(pc++);
+    int8_t offset = static_cast<int8_t>(read(pc++));
     current_address = offset + pc;
 }
 
-//endregion
+// endregion
 
-//region Instructions
+// region Instructions
 
 // Add with Carry
 // Adds the contents of a memory location to the accumulator
@@ -298,13 +311,7 @@ void Cpu::BPL() {
 // processor status are pushed on the stack then the IRQ interrupt vector at
 // $FFFE/F is loaded into the PC and the break flag in the status set to one.
 void Cpu::BRK() {
-    pc++;
-    stack_push_word(pc);
-    stack_push(status.get() | Flag::Break);
-
-    uint16_t hi = read(0xFFFF) << 8;
-    uint16_t lo = read(0xFFFE);
-    pc = (hi | lo);
+    interrupt(InterruptType::BRK);
 }
 
 // Branch if Overflow Clear
@@ -552,9 +559,14 @@ void Cpu::ROR() {
 // Used at the end of an interrupt processing routine. It pulls the
 // processor flags from the stack followed by the program counter.
 void Cpu::RTI() {
+    // Set the status back to the previous state, which was stored on the stack
     status.set(stack_pop());
+    
+    // Clear the B and U flags
     status.set(status.get() & ~Flag::Break & ~Flag::Unused);
-    pc = stack_pop() | (stack_pop() << 8);
+    
+    // Retrieve the previous program counter, which was stored on the stack
+    pc = stack_pop_word();
 }
 
 // Return from Subroutine
@@ -657,6 +669,10 @@ void Cpu::TYA() {
     status.update(Flag::Zero | Flag::Negative, y);
 }
 
+// endregion
+
+// region Convenience Methods
+
 // Convenience method for branching instructions (e.g. BCS, BCC, BNE).
 // Performs the branching operation if the condition is met.
 void Cpu::branch_if(bool condition) {
@@ -698,8 +714,10 @@ void Cpu::stack_push(uint8_t data) {
 
 // Push two bytes onto the stack.
 void Cpu::stack_push_word(uint16_t data) {
-    stack_push((data >> 8) & 0xFF);
-    stack_push(data & 0xFF);
+    uint8_t hi = (data >> 8) & 0xFF;
+    uint8_t lo = data & 0xFF;
+    stack_push(hi);
+    stack_push(lo);
 }
 
 // Pop a single byte from the stack.
@@ -713,10 +731,43 @@ uint8_t Cpu::stack_pop() {
 
 // Pop two bytes from the stack.
 uint16_t Cpu::stack_pop_word() {
-    uint8_t low = stack_pop();
+    uint16_t lo = stack_pop();
     uint16_t hi = (stack_pop() << 8);
-    return (hi | low);
+    return (hi | lo);
 }
+
+// Convenience method for working with interrupts. This method handles the
+// three interrupt types (IRQ, NMI, and BRK).
+void Cpu::interrupt(Cpu::InterruptType type) {
+    // Don't allow an IRQ to occur if the I flag is set in the status register
+    if (type == InterruptType::IRQ && status.is_set(Flag::InterruptDisable)) {
+        return;
+    }
+
+    if (type == InterruptType::BRK) {
+        // Need to increment the program counter for BRK interrupts
+        pc++;
+    }
+
+    // Push the current program counter on the stack
+    stack_push_word(pc);
+
+    // Set the I flag and set the B flag if it's a BRK (software) interrupt
+    status.set(Flag::InterruptDisable | Flag::Unused);
+    status.update(Flag::Break, type == InterruptType::BRK);
+
+    // Save the state of the status register onto the stack
+    stack_push(status.get());
+
+    // Set the program counter to the vector defined by the interrupt type
+    pc = read_word(static_cast<uint16_t>(type));
+
+    cycles += 7;
+}
+
+// endregion
+
+// region Initialization and Debug Methods
 
 // Initializes the mappings for all instructions.
 // See https://www.masswerk.at/6502/6502_instruction_set.html
@@ -725,9 +776,9 @@ void Cpu::initialize() {
     using Mode = Cpu::AddressingMode;
     //@formatter:off
     instructions = {
-            { 0x00, Type::BRK, Mode::Implied,     &Cpu::BRK, &Cpu::implied,     1, 7 },
-            { 0x01, Type::ORA, Mode::IndirectX,   &Cpu::ORA, &Cpu::indirect_x,  2, 6 },
-            { 0x02, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
+            { 0x00, Type::BRK, Mode::Implied,     &Cpu::BRK, &Cpu::implied,     1, 0 }, // Setting BRK cycles to 0 here,
+            { 0x01, Type::ORA, Mode::IndirectX,   &Cpu::ORA, &Cpu::indirect_x,  2, 6 }, // even though it's actually 7.
+            { 0x02, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 }, // It is handled in the interrupt method.
             { 0x03, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
             { 0x04, Type::NOP, Mode::Implied,     &Cpu::NOP, &Cpu::implied,     1, 2 },
             { 0x05, Type::ORA, Mode::ZeroPage,    &Cpu::ORA, &Cpu::zero_page,   2, 3 },
@@ -1073,4 +1124,4 @@ std::string Cpu::get_addressing_mode_name(Cpu::AddressingMode mode) {
     //@formatter:on
 }
 
-//endregion
+// endregion
