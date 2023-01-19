@@ -6,7 +6,7 @@
 
 class MapperNROM : public Mapper {
 public:
-    MapperNROM(uint8_t prg_rom_size);
+    explicit MapperNROM(uint8_t prg_rom_size);
     ~MapperNROM();
     uint16_t map_address_prg(uint16_t address) override;
     uint16_t map_address_chr(uint16_t address) override;
