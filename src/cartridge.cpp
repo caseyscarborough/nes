@@ -2,8 +2,6 @@
 
 #include <memory>
 #include "mappers/mapper_nrom.h"
-#include "mappers/mapper_mmc1.h"
-#include "mappers/mapper_cnrom.h"
 
 bool Cartridge::load(const std::string &path) {
     LOG("Loading ROM from path " << path)
@@ -58,13 +56,7 @@ bool Cartridge::load(const std::string &path) {
 
     switch (mapper_id) {
         case Mapper::NROM:
-            mapper = new MapperNROM(this);
-            break;
-        case Mapper::MMC1:
-            mapper = new MapperMMC1();
-            break;
-        case Mapper::CNROM:
-            mapper = new MapperCNROM();
+            mapper = new MapperNROM(prg_rom_size);
             break;
         default:
             LOG_ERROR("Mapper " << unsigned(mapper_id) << " is not implemented!")
@@ -86,17 +78,21 @@ bool Cartridge::has_flag(uint8_t flags, uint8_t flag) {
 }
 
 uint8_t Cartridge::prg_read(uint16_t address) {
-    return this->mapper->prg_read(address);
+    uint16_t mapped_address = mapper->map_address_prg(address);
+    return prg_memory[mapped_address];
 }
 
 void Cartridge::prg_write(uint16_t address, uint8_t data) {
-    this->mapper->prg_write(address, data);
+    uint16_t mapped_address = mapper->map_address_prg(address);
+    prg_memory[mapped_address] = data;
 }
 
 uint8_t Cartridge::chr_read(uint16_t address) {
-    return this->mapper->chr_read(address);
+    uint16_t mapped_address = mapper->map_address_chr(address);
+    return chr_memory[mapped_address];
 }
 
 void Cartridge::chr_write(uint16_t address, uint8_t data) {
-    this->mapper->chr_write(address, data);
+    uint16_t mapped_address = mapper->map_address_chr(address);
+    chr_memory[mapped_address] = data;
 }

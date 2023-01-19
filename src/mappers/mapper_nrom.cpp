@@ -1,31 +1,21 @@
 #include "mapper.h"
 #include "mapper_nrom.h"
 
-MapperNROM::MapperNROM(Cartridge *cartridge) {
+MapperNROM::MapperNROM(uint8_t prg_rom_size) {
     type = NROM;
-    this->cartridge = cartridge;
-}
-
-uint8_t MapperNROM::prg_read(uint16_t address) {
-    auto offset = address - 0x8000;
-    if (cartridge->prg_rom_size == 1) {
-        return cartridge->prg_memory[offset & 0x3FFF];
-    } else {
-        return cartridge->prg_memory[offset];
-    }
-}
-
-void MapperNROM::prg_write(uint16_t address, uint8_t data) {
-    LOG_ERROR("Attempted to write into Read-Only Cartridge PRG-ROM space "
-              "at address 0x" << std::hex << std::uppercase << address)
-}
-
-uint8_t MapperNROM::chr_read(uint16_t address) {
-    return 0;
-}
-
-void MapperNROM::chr_write(uint16_t address, uint8_t data) {
+    this->prg_rom_size = prg_rom_size;
 }
 
 MapperNROM::~MapperNROM() = default;
+
+
+uint16_t MapperNROM::map_address_prg(uint16_t address) {
+    auto offset = address - 0x8000;
+    return prg_rom_size == 1 ? offset & 0x3FFFF : offset;
+}
+
+uint16_t MapperNROM::map_address_chr(uint16_t address) {
+    // No mapping performed for CHR-ROM in Mapper 0
+    return address;
+}
 

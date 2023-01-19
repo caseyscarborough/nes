@@ -3,18 +3,15 @@
 
 
 #include "mapper.h"
-#include "../cartridge.h"
 
 class MapperNROM : public Mapper {
 public:
-    MapperNROM(Cartridge *cartridge);
+    MapperNROM(uint8_t prg_rom_size);
     ~MapperNROM();
-    uint8_t prg_read(uint16_t address) override;
-    void prg_write(uint16_t address, uint8_t data) override;
-    uint8_t chr_read(uint16_t address) override;
-    void chr_write(uint16_t address, uint8_t data) override;
+    uint16_t map_address_prg(uint16_t address) override;
+    uint16_t map_address_chr(uint16_t address) override;
 private:
-    Cartridge *cartridge;
+    uint8_t prg_rom_size;
 };
 
 
