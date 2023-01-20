@@ -11,7 +11,7 @@ MapperNROM::~MapperNROM() = default;
 
 uint16_t MapperNROM::map_address_prg(uint16_t address) {
     auto offset = address - 0x8000;
-    return prg_rom_size == 1 ? offset & 0x3FFFF : offset;
+    return prg_rom_size == 1 ? offset & 0x3FFF : offset;
 }
 
 uint16_t MapperNROM::map_address_chr(uint16_t address) {
