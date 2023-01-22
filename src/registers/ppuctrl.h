@@ -6,7 +6,7 @@
 
 // PPUCTRL register for the PPU.
 // See https://www.nesdev.org/wiki/PPU_registers#PPUCTRL
-class PpuCtrl : public Register {
+class PpuCtrl : public Register<uint8_t> {
 public:
     //@formatter:off
     enum Flag {

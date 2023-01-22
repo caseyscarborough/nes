@@ -6,7 +6,7 @@
 
 // PPUMASK register for the PPU
 // See https://www.nesdev.org/wiki/PPU_registers#PPUMASK
-class PpuMask : public Register {
+class PpuMask : public Register<uint8_t> {
 public:
     //@formatter:off
     enum Flag {

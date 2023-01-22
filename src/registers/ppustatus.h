@@ -6,7 +6,7 @@
 
 // PPUSTATUS register for the PPU.
 // See https://www.nesdev.org/wiki/PPU_registers#PPUSTATUS
-class PpuStatus : public Register {
+class PpuStatus : public Register<uint8_t> {
 public:
     //@formatter:off
     enum Flag {

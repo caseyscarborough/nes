@@ -6,7 +6,7 @@
 #include "register.h"
 
 // Status register for the CPU.
-class StatusRegister : public Register {
+class StatusRegister : public Register<uint8_t> {
 public:
     //@formatter:off
     // Flags for the status register
