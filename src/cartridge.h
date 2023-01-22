@@ -58,7 +58,7 @@ class Cartridge {
     uint8_t prg_ram_size;
     uint8_t version;
 
-    Mapper *mapper;
+    std::unique_ptr<Mapper> mapper;
     std::vector<uint8_t> prg_memory;
     std::vector<uint8_t> chr_memory;
 

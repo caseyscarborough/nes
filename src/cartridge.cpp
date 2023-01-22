@@ -56,7 +56,7 @@ bool Cartridge::load(const std::string &path) {
 
     switch (mapper_id) {
         case Mapper::NROM:
-            mapper = new MapperNROM(prg_rom_size);
+            mapper = std::make_unique<MapperNROM>(prg_rom_size);
             break;
         default:
             LOG_ERROR("Mapper " << unsigned(mapper_id) << " is not implemented!")
