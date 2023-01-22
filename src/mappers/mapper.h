@@ -11,6 +11,7 @@ public:
         MMC1 = 1,
         CNROM = 3,
     };
+    virtual ~Mapper();
     virtual uint16_t map_address_prg(uint16_t address) = 0;
     virtual uint16_t map_address_chr(uint16_t address) = 0;
     Type get_type();
