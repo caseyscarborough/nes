@@ -1,7 +1,6 @@
-
-#include "cartridge.h"
-#include "cpu.h"
-#include "bus.h"
+#include "src/cartridge.h"
+#include "src/cpu.h"
+#include "src/bus.h"
 #include <thread>
 
 int main(int argc, char **argv) {
