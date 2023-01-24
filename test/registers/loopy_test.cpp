@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include "../../src/registers/loopy.h"
 
-TEST(LoopyRegister, set) {
+TEST(LoopyRegisterTest, test_set) {
     LoopyRegister reg;
     EXPECT_EQ(reg.get_value(), 0b0000000000000000);
     reg.set(LoopyRegister::CoarseX, 0b11111);
@@ -17,4 +17,12 @@ TEST(LoopyRegister, set) {
     EXPECT_EQ(reg.get_value(), 0b0011001010111111);
     reg.set(LoopyRegister::CoarseX, 0b1000000);
     EXPECT_EQ(reg.get_value(), 0b0011001010100000);
+}
+
+TEST(LoopyRegisterTest, test_increment) {
+    LoopyRegister reg;
+    reg.increment(2);
+    EXPECT_EQ(reg.get_value(), 2);
+    reg.increment(10);
+    EXPECT_EQ(reg.get_value(), 12);
 }
