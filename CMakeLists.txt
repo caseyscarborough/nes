@@ -3,8 +3,8 @@ project(nes)
 
 set(CMAKE_CXX_STANDARD 20)
 
-file(GLOB SOURCES src/**/*.cpp)
-file(GLOB TESTS test/**/*.cpp)
+file(GLOB SOURCES src/*.cpp src/**/*.cpp)
+file(GLOB TESTS test/**.cpp test/**/*.cpp)
 
 add_executable(nes main.cpp ${SOURCES})
 add_executable(nes_test ${SOURCES} ${TESTS})
