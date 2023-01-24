@@ -1,7 +1,7 @@
 #ifndef NES_LOOPY_H
 #define NES_LOOPY_H
 
-
+#include <cstdint>
 #include "register.h"
 
 // Used for the "Loopy" registers inside the PPU (Current VRAM address and Temporary VRAM address)
