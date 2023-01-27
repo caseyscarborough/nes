@@ -89,7 +89,7 @@ void Cpu::reset() {
     // Hardware stack grows downward, so we start at the top of the page (0xFF).
     sp = STACK_STARTUP_STATE;
     status.set(Flag::InterruptDisable | Flag::Negative);
-    cycles = 8;
+    cycles = 0;
 }
 
 // The NMI interrupt is a non-maskable interrupt, meaning that it cannot

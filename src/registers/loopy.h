@@ -21,9 +21,6 @@ public:
         FineY      = 0x7000, // 3 bits
         Unused     = 0x8000, // 1 bit
     };
-
-    void increment(uint16_t by);
-    void set(LoopyRegister::Flag flag, uint16_t data);
 };
 
 

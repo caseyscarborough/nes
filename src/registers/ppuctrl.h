@@ -10,7 +10,8 @@ class PpuCtrl : public Register<uint8_t> {
 public:
     //@formatter:off
     enum Flag {
-        Nametable      = 0x0003, // Base nametable address (0 = $2000; 1 = $2400; 2 = $2800; 3 = $2C00)
+        NametableX     = 1 << 0, // Base nametable address (0 = $2000; 1 = $2400; 2 = $2800; 3 = $2C00)
+        NametableY     = 1 << 1,
         IncrementMode  = 1 << 2, // VRAM address increment per CPU read/write of PPUDATA (0: add 1, going across; 1: add 32, going down)
         SpriteTile     = 1 << 3, // Sprite pattern table address for 8×8 sprites (0: $0000; 1: $1000; ignored in 8×16 mode)
         BackgroundTile = 1 << 4, // Background pattern table address (0: $0000; 1: $1000)
@@ -19,6 +20,9 @@ public:
         NmiEnable      = 1 << 7, // Generate an NMI at the start of the vertical blanking interval (0: off; 1: on)
     };
     //@formatter:on
+    uint8_t get_increment() {
+        return is_set(IncrementMode) ? 32 : 1;
+    }
 };
 
 

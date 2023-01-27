@@ -78,34 +78,79 @@ Ppu::Ppu() {
     };
 }
 
-// TODO: Implement read/write functions
 uint8_t Ppu::cpu_read(uint16_t address) {
     switch (address) {
-        case 0x2002: {
+        case PPUSTATUS: {
             uint8_t data = status.get_value() & 0xE0; // mask the top three bits
             status.clear(PpuStatus::Flag::VerticalBlank);
-            // TODO: Handle loopy register
+            write_toggle = false;
             return data;
         }
-        case 0x2004: // TODO: Handle OAM
-        case 0x2007: // TODO: Handle PPUDATA
+        case OAMDATA:
+            return 0x0; // TODO: Handle Object Attribute Memory
+        case PPUDATA: {
+            uint8_t data = ppu_data_buffer;
+            ppu_data_buffer = ppu_read(vram_address.get_value());
+            if (vram_address >= 0x3F00) {
+                data = ppu_data_buffer;
+            }
+            vram_address += control.get_increment();
+            return data;
+        }
         default:
+            // Other addresses are not readable
             return 0x0;
     }
 }
 
 void Ppu::cpu_write(uint16_t address, uint8_t data) {
-
+    switch (address) {
+        case PPUCTRL:
+            control.set_value(data);
+            vram_address_temp.set(LoopyRegister::NametableX, control.get(PpuCtrl::NametableX));
+            vram_address_temp.set(LoopyRegister::NametableY, control.get(PpuCtrl::NametableY));
+            break;
+        case PPUMASK:
+            mask.set_value(data);
+            break;
+        case PPUSCROLL:
+            if (!write_toggle) {
+                fine_x = data & 0x07;
+                vram_address_temp.set(LoopyRegister::CoarseX, data >> 3);
+            } else {
+                vram_address_temp.set(LoopyRegister::FineY, data & 0x07);
+                vram_address_temp.set(LoopyRegister::CoarseY, data >> 3);
+            }
+            write_toggle = !write_toggle;
+        case PPUADDR:
+            if (!write_toggle) {
+                vram_address_temp.set_value(((uint16_t)(data & 0x3F) << 8) | (vram_address_temp.get_value() & 0x00FF));
+            } else {
+                vram_address_temp.set_value((vram_address_temp.get_value() & 0xFF00) | data);
+            }
+            write_toggle = !write_toggle;
+        case PPUDATA:
+            ppu_write(vram_address.get_value(), data);
+            vram_address += control.get_increment();
+        default:
+            break;
+    }
 }
 
 uint8_t Ppu::ppu_read(uint16_t address) {
+    // TODO: Implement
     return 0;
 }
 
 void Ppu::ppu_write(uint16_t address, uint8_t data) {
-
+    // TODO: Implement
 }
 
 void Ppu::clock() {
 
+}
+
+void Ppu::reset() {
+    // TODO: Implement
+    write_toggle = false;
 }

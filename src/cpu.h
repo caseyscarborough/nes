@@ -18,7 +18,7 @@ public:
     void reset();
     void nmi();
     void irq();
-private:
+
     enum class InstructionType {
         ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC,
         CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY, EOR, INC, INX, INY, JMP,
@@ -45,6 +45,8 @@ private:
         uint8_t cycles;
     };
 
+protected: // Protected to allow access for unit testing
+
     uint8_t a;        // accumulator
     uint8_t x;        // x register
     uint8_t y;        // y register
@@ -52,7 +54,7 @@ private:
     uint8_t sp;       // stack pointer
     uint16_t cycles;  // current cycles
     StatusRegister status; // status register (P)
-    uint16_t total_cycles; // total clock cycles
+    uint32_t total_cycles; // total clock cycles
 
     uint16_t current_address; // current address
     Instruction current_instruction; // current instruction
@@ -60,9 +62,9 @@ private:
 
     // the main bus and methods for communicating with other components
     Bus *bus;
-    uint8_t read(uint16_t address);
+    virtual uint8_t read(uint16_t address);
     uint16_t read_word(uint16_t address);
-    void write(uint16_t address, uint8_t data);
+    virtual void write(uint16_t address, uint8_t data);
     // same as write, except writes to the accumulator instead
     // of memory if the current addressing mode is accumulator.
     void write_acc(uint16_t address, uint8_t data);
