@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 #include "../../src/registers/status.h"
 
-class TestRegister : public Register<uint16_t> {};
+class TestRegister : public Register<uint16_t> {
+public:
+
+};
 
 class RegisterTest : public ::testing::Test {
 public:
@@ -64,4 +67,29 @@ TEST_F(RegisterTest, test_is_clear) {
     EXPECT_TRUE(reg.is_clear(0b0100));
     EXPECT_FALSE(reg.is_clear(0b0010));
     EXPECT_FALSE(reg.is_clear(0b1000));
+}
+
+TEST_F(RegisterTest, test_get) {
+    reg.set_value(0b10010010100);
+    EXPECT_EQ(reg.get(0b11100), 0b101);
+    EXPECT_EQ(reg.get(0b10000000000), 1);
+    EXPECT_EQ(reg.get(0b1000000000), 0);
+    EXPECT_EQ(reg.get(0b11110000000), 0b1001);
+    EXPECT_EQ(reg.get(0b1), 0);
+    EXPECT_EQ(reg.get(0b1100000), 0);
+}
+
+TEST_F(RegisterTest, test_increment) {
+    reg += 2;
+    EXPECT_EQ(reg.get_value(), 2);
+    reg += 10;
+    EXPECT_EQ(reg.get_value(), 12);
+}
+
+TEST_F(RegisterTest, test_decrement) {
+    reg.set_value(15);
+    reg -= 2;
+    EXPECT_EQ(reg.get_value(), 13);
+    reg -= 5;
+    EXPECT_EQ(reg.get_value(), 8);
 }

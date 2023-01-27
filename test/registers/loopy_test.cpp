@@ -18,11 +18,3 @@ TEST(LoopyRegisterTest, test_set) {
     reg.set(LoopyRegister::CoarseX, 0b1000000);
     EXPECT_EQ(reg.get_value(), 0b0011001010100000);
 }
-
-TEST(LoopyRegisterTest, test_increment) {
-    LoopyRegister reg;
-    reg.increment(2);
-    EXPECT_EQ(reg.get_value(), 2);
-    reg.increment(10);
-    EXPECT_EQ(reg.get_value(), 12);
-}
