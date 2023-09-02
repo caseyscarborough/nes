@@ -38,3 +38,10 @@ You can run the unit tests by running the following (while still in the `build` 
 ```bash
 ./nes_test
 ```
+
+## References
+
+- [@javidx9 on YouTube](https://www.youtube.com/playlist?list=PLrOv9FMX8xJHqMvSGB_9G9nZZ_4IgteYf) / [@OneLoneCoder on GitHub](https://github.com/OneLoneCoder/olcNES)
+- [Nesdev Wiki](https://www.nesdev.org/wiki/Nesdev_Wiki)
+- [amhndu/SimpleNES](https://github.com/amhndu/SimpleNES)
+
